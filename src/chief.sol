@@ -1,13 +1,15 @@
 import 'ds-token/token.sol';
 
-contract Approval {
+// The right way to use this contract is probably to mix it with some kind
+// of `DSAuthority`, like with `ds-roles`.
+contract DSChief {
     mapping(bytes32=>address[]) slates;
     mapping(address=>bytes32) votes;
     mapping(address=>uint256) approvals;
     mapping(address=>uint256) deposits;
     DSToken public GOV; // voting token that gets locked up
     DSToken public IOU; // non-voting representation of a token, for e.g. secondary voting mechanisms
-    address public gov; // governance rules
+    address public hat; // the chieftain's hat
 
     uint256 public MAX_YAYS;
 
@@ -65,9 +67,9 @@ contract Approval {
         vote(slate);
         lift(lift_whom);
     }
-    // like `drop`/`swap` except simply "elect this address if it is higher than current gov"
+    // like `drop`/`swap` except simply "elect this address if it is higher than current hat"
     function lift(address whom) {
-        require(approvals[whom] > approvals[gov]);
-        gov = whom;
+        require(approvals[whom] > approvals[hat]);
+        hat = whom;
     }
 }

@@ -2,20 +2,26 @@ pragma solidity ^0.4.15;
 
 import 'ds-token/token.sol';
 import 'ds-roles/roles.sol';
+import 'ds-math/math.sol';
 
 // The right way to use this contract is probably to mix it with some kind
 // of `DSAuthority`, like with `ds-roles`.
 //   SEE DSChief
-contract DSChiefApprovals {
-    mapping(bytes32=>address[]) slates;
-    mapping(address=>bytes32) votes;
-    mapping(address=>uint256) approvals;
-    mapping(address=>uint256) deposits;
+contract DSChiefApprovals is DSMath {
+    mapping(bytes32=>address[]) public slates;
+    mapping(address=>bytes32) public votes;
+    mapping(address=>uint128) public approvals;
+    mapping(address=>uint128) public deposits;
     DSToken public GOV; // voting token that gets locked up
     DSToken public IOU; // non-voting representation of a token, for e.g. secondary voting mechanisms
     address public hat; // the chieftain's hat
 
     uint256 public MAX_YAYS;
+
+    event LockFree(address indexed who, uint128 before, uint128 afterwards);
+    event Etch(bytes32 indexed slate);
+    event Vote(address indexed who, bytes32 indexed slate, uint128 before, uint128 afterwards);
+    event Lift(address indexed hat_);
 
     // IOU constructed outside this contract reduces deployment costs significantly
     // lock/free/vote are quite sensitive to token invariants. Caution is advised.
@@ -28,27 +34,34 @@ contract DSChiefApprovals {
 
     function lock(uint128 wad) {
         GOV.pull(msg.sender, wad);
-        deposits[msg.sender] += wad;
+        uint128 before = deposits[msg.sender];
+        uint128 after_ = wadd(deposits[msg.sender], wad);
         IOU.mint(wad);
         IOU.push(msg.sender, wad);
+        deposits[msg.sender] = after_;
+        LockFree(msg.sender, before, after_);
     }
     function free(uint128 wad) {
         IOU.pull(msg.sender, wad);
+        uint128 before = deposits[msg.sender];
+        uint128 after_ = wsub(deposits[msg.sender], wad);
         IOU.burn(wad);
-        deposits[msg.sender] -= wad;
         GOV.push(msg.sender, wad);
+        deposits[msg.sender] = after_;
+        LockFree(msg.sender, before, after_);
     }
 
     function etch(address[] yays) returns (bytes32 slate) {
         require( yays.length < MAX_YAYS );
         bytes32 hash = sha3(yays);
         slates[hash] = yays;
+        Etch(hash);
         return hash;
     }
     function addVote(bytes32 slate)
         internal
     {
-        uint weight = deposits[msg.sender];
+        uint128 weight = deposits[msg.sender];
         var yays = slates[slate];
         for( uint i = 0; i < yays.length; i++ ) {
             approvals[yays[i]] += weight;
@@ -57,7 +70,7 @@ contract DSChiefApprovals {
     function subVote(bytes32 slate)
         internal
     {
-        uint weight = deposits[msg.sender];
+        uint128 weight = deposits[msg.sender];
         var yays = slates[slate];
         for( uint i = 0; i < yays.length; i++ ) {
             approvals[yays[i]] -= weight;
@@ -113,7 +126,7 @@ contract DSChief is DSRoles, DSChiefApprovals {
     }
     function setRootUser(address who, bool enabled) {
         require( who != hat || enabled == true ); // can't unset `hat`
-        super.setRootUser();
+        super.setRootUser(who, enabled);
     }
 
 }

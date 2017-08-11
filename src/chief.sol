@@ -3,6 +3,7 @@ import 'ds-roles/roles.sol';
 
 // The right way to use this contract is probably to mix it with some kind
 // of `DSAuthority`, like with `ds-roles`.
+//   SEE DSChief
 contract DSChiefApprovals {
     mapping(bytes32=>address[]) slates;
     mapping(address=>bytes32) votes;
@@ -100,23 +101,16 @@ contract DSChief is DSRoles, DSChiefApprovals {
         constant
         returns (bool)
     {
-        if( who == hat ) {
-            return true;
-        } else  {
-            return super.isUserRoot(who);
-        }
+        return (who == hat) || super.isUserRoot(who);
     }
     // function getCapabilityRoles
     // function isCapabilityPublic
     function setUserRole(address who, uint8 role, bool enabled) {
-        if( role == 0 ) {
-            throw;
-        } else {
-            super.setUserRole(who, role, enabled);
-        }
+        require( role > 0 );
+        super.setUserRole(who, role, enabled);
     }
     function setRootUser(address who, bool enabled) {
-        throw;
+        revert();
     }
 
 }

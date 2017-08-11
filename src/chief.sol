@@ -112,7 +112,8 @@ contract DSChief is DSRoles, DSChiefApprovals {
         super.setUserRole(who, role, enabled);
     }
     function setRootUser(address who, bool enabled) {
-        revert();
+        require( who != hat || enabled == true ); // can't unset `hat`
+        super.setRootUser();
     }
 
 }

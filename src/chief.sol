@@ -16,7 +16,8 @@ contract DSChiefApprovals {
 
     // IOU constructed outside this contract reduces deployment costs significantly
     // lock/free/vote are quite sensitive to token invariants. Caution is advised.
-    function DSChiefApprovals(uint MAX_YAYS_, DSToken GOV_, DSToken IOU_) {
+    function DSChiefApprovals(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_)
+    {
         GOV = GOV_;
         IOU = IOU_;
         MAX_YAYS = MAX_YAYS_;
@@ -79,7 +80,12 @@ contract DSChiefApprovals {
 // `hat` address is unique root user (has every role) and the
 // unique owner of role 0 (typically 'sys' or 'internal')
 contract DSChief is DSRoles, DSChiefApprovals {
-    // override
+
+    function DSChief(DSToken GOV, DSToken IOU, uint MAX_YAYS)
+             DSChiefApprovals (GOV, IOU, MAX_YAYS)
+    {
+    }   
+ 
     function getUserRoles(address who)
         constant
         returns (bytes32)

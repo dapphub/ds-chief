@@ -1,6 +1,5 @@
-html { font: 16pt/1.5 monospace }
-body { margin: 2rem auto }
-body { max-width: 48rem }
+html { font: 16pt/1.5 monospace; overflow-y: scroll }
+body { margin: 2rem auto; max-width: 48rem }
 th, td { text-align: right; vertical-align: top }
 [onclick] { cursor: pointer }
 input, textarea { box-sizing: border-box }

@@ -1,0 +1,29 @@
+<!doctype html>
+<link rel=stylesheet href=index.css>
+<table>
+<tr onclick="lock.classList.toggle('hide')">
+<th> GOV balance <td id=gov-balance> 0.000000000000000000
+<tbody id=lock class=hide>
+<tr> <th> <td> <input placeholder=0.000000000000000000>
+<tr> <th> <td> <button> Lock </button>
+</tbody>
+<tr onclick="free.classList.toggle('hide')">
+<th> IOU balance <td id=iou-balance> 0.000000000000000000
+<tbody id=free class=hide>
+<tr> <th> <td> <input placeholder=0.000000000000000000>
+<tr> <th> <td> <button> Free </button>
+</tbody>
+<tr onclick="vote.classList.toggle('hide')">
+<th> Your votes <td> (none)
+<tbody id=vote class=hide>
+<tr> <th> <td> <textarea cols=42 rows=4></textarea>
+<tr> <th> <td> <button> Vote </button>
+</tbody>
+<tr> <th> Chieftain <td> 0x1234567890123456789012345678901234567890
+<tr> <th> Top ranked <td style="padding: 0">
+<table>
+<tr> <th> 300.45 <td> 0x1234567890123456789012345678901234567890
+<tr> <th> 105.00 <td> 0x5678901234567890123456789012345678901234
+<tr> <th> 8.00 <td> 0x9012345678901234567890123456789012345678
+</table>
+</table>

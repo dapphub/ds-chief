@@ -59,6 +59,20 @@ contract DSChiefApprovals is DSThing {
         slates[hash] = yays;
         return hash;
     }
+    function vote(address[] guys) returns (bytes32)
+        // note  both sub-calls note
+    {
+        var slate = etch(guys);
+        vote(slate);
+        return slate;
+    }
+    function vote(address[] guys, address lift_whom) returns (bytes32)
+        // note  both sub-calls note
+    {
+        var slate = vote(guys);
+        lift(lift_whom);
+        return slate;
+    }
     function vote(bytes32 slate)
         note
     {

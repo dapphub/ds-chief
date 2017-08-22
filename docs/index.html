@@ -19,13 +19,14 @@
 <tr onclick="vote.classList.toggle('hide')">
 <th> Your approvals <td> (none)
 <tbody id=vote class=hide>
-<tr> <th> <td> <textarea cols=42 rows=4></textarea>
+<tr> <th> <td> <textarea cols=42 rows=4 id=approvals></textarea>
 <tr> <th> <td> <button> Update approvals
 <tbody style="border-top: 2rem solid transparent">
 <tr> <th> Top candidates <td style="padding: 0">
-<table>
-<tr> <td> 300.45 <td> 0x1234567890123456789012345678901234567890
-<tr> <td> 108.00 <td> 0x5678901234567890123456789012345678901234
-<tr> <td> 100.00 <td> 0x7890123456789012345678901234567890123456
-<tr> <td> 8.00 <td> 0x9012345678901234567890123456789012345678
-<tr> <td> 0.45 <td> 0x4567890123456789012345678901234567890123
+<table id=candidates>
+<tr> <td> 300.45 <td onclick="approve(event)"> 0x1234567890123456789012345678901234567890
+<tr> <td> 108.00 <td onclick="approve(event)"> 0x5678901234567890123456789012345678901234
+<tr> <td> 100.00 <td onclick="approve(event)"> 0x7890123456789012345678901234567890123456
+<tr> <td> 8.00 <td onclick="approve(event)"> 0x9012345678901234567890123456789012345678
+<tr> <td> 0.45 <td onclick="approve(event)"> 0x4567890123456789012345678901234567890123
+<script src=index.js></script>

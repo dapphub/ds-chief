@@ -18,10 +18,10 @@ contract DSChiefApprovals is DSMath {
 
     uint256 public MAX_YAYS;
 
-    event LockFree(address indexed who, uint128 before, uint128 afterwards);
-    event Etch(bytes32 indexed slate);
-    event Vote(address indexed who, bytes32 indexed slate, uint128 before, uint128 afterwards);
-    event Lift(address indexed hat_);
+    event LogLockFree(address indexed who, uint128 before, uint128 afterwards);
+    event LogEtch(bytes32 indexed slate);
+    event LogVote(address indexed who, bytes32 indexed slate, uint128 before, uint128 afterwards);
+    event LogLift(address indexed hat_);
 
     // IOU constructed outside this contract reduces deployment costs significantly
     // lock/free/vote are quite sensitive to token invariants. Caution is advised.
@@ -39,7 +39,7 @@ contract DSChiefApprovals is DSMath {
         IOU.mint(wad);
         IOU.push(msg.sender, wad);
         deposits[msg.sender] = after_;
-        LockFree(msg.sender, before, after_);
+        LogLockFree(msg.sender, before, after_);
     }
     function free(uint128 wad) {
         IOU.pull(msg.sender, wad);
@@ -48,14 +48,14 @@ contract DSChiefApprovals is DSMath {
         IOU.burn(wad);
         GOV.push(msg.sender, wad);
         deposits[msg.sender] = after_;
-        LockFree(msg.sender, before, after_);
+        LogLockFree(msg.sender, before, after_);
     }
 
     function etch(address[] yays) returns (bytes32 slate) {
         require( yays.length < MAX_YAYS );
         bytes32 hash = sha3(yays);
         slates[hash] = yays;
-        Etch(hash);
+        LogEtch(hash);
         return hash;
     }
     function addVote(bytes32 slate)
@@ -100,8 +100,8 @@ contract DSChief is DSRoles, DSChiefApprovals {
     function DSChief(DSToken GOV, DSToken IOU, uint MAX_YAYS)
              DSChiefApprovals (GOV, IOU, MAX_YAYS)
     {
-    }   
- 
+    }
+
     function getUserRoles(address who)
         constant
         returns (bytes32)

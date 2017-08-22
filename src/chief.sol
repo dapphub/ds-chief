@@ -59,6 +59,27 @@ contract DSChiefApprovals is DSThing {
         slates[hash] = yays;
         return hash;
     }
+    function vote(bytes32 slate)
+        note
+    {
+        uint128 weight = deposits[msg.sender];
+        subWeight(weight, votes[msg.sender]);
+        votes[msg.sender] = slate;
+        addWeight(weight, votes[msg.sender]);
+    }
+    function vote(bytes32 slate, address lift_whom)
+        // note  both sub-calls note
+    {
+        vote(slate);
+        lift(lift_whom);
+    }
+    // like `drop`/`swap` except simply "elect this address if it is higher than current hat"
+    function lift(address whom)
+        note
+    {
+        require(approvals[whom] > approvals[hat]);
+        hat = whom;
+    }
     function addWeight(uint128 weight, bytes32 slate)
         internal
     {
@@ -74,27 +95,6 @@ contract DSChiefApprovals is DSThing {
         for( uint i = 0; i < yays.length; i++) {
             approvals[yays[i]] = wsub(approvals[yays[i]], weight);
         }
-    }
-    function vote(bytes32 slate)
-        note
-    {
-        uint128 weight = deposits[msg.sender];
-        subWeight(weight, votes[msg.sender]);
-        votes[msg.sender] = slate;
-        addWeight(weight, votes[msg.sender]);
-    }
-    function vote(bytes32 slate, address lift_whom)
-        note
-    {
-        vote(slate);
-        lift(lift_whom);
-    }
-    // like `drop`/`swap` except simply "elect this address if it is higher than current hat"
-    function lift(address whom)
-        note
-    {
-        require(approvals[whom] > approvals[hat]);
-        hat = whom;
     }
 }
 

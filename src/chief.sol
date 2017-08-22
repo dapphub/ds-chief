@@ -2,12 +2,12 @@ pragma solidity ^0.4.15;
 
 import 'ds-token/token.sol';
 import 'ds-roles/roles.sol';
-import 'ds-math/math.sol';
+import 'ds-thing/thing.sol';
 
 // The right way to use this contract is probably to mix it with some kind
 // of `DSAuthority`, like with `ds-roles`.
 //   SEE DSChief
-contract DSChiefApprovals is DSMath {
+contract DSChiefApprovals is DSThing {
     mapping(bytes32=>address[]) public slates;
     mapping(address=>bytes32) public votes;
     mapping(address=>uint128) public approvals;
@@ -18,11 +18,6 @@ contract DSChiefApprovals is DSMath {
 
     uint256 public MAX_YAYS;
 
-    event LogLockFree(address indexed who, uint128 before, uint128 afterwards);
-    event LogEtch(bytes32 indexed slate);
-    event LogVote(address indexed who, bytes32 indexed slate, uint128 before, uint128 afterwards);
-    event LogLift(address indexed hat_);
-
     // IOU constructed outside this contract reduces deployment costs significantly
     // lock/free/vote are quite sensitive to token invariants. Caution is advised.
     function DSChiefApprovals(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_)
@@ -32,7 +27,9 @@ contract DSChiefApprovals is DSMath {
         MAX_YAYS = MAX_YAYS_;
     }
 
-    function lock(uint128 wad) {
+    function lock(uint128 wad)
+        note
+    {
         GOV.pull(msg.sender, wad);
         uint128 before = deposits[msg.sender];
         uint128 after_ = wadd(deposits[msg.sender], wad);
@@ -40,9 +37,10 @@ contract DSChiefApprovals is DSMath {
         IOU.push(msg.sender, wad);
         deposits[msg.sender] = after_;
         addWeight(wad, votes[msg.sender]);
-        LogLockFree(msg.sender, before, after_);
     }
-    function free(uint128 wad) {
+    function free(uint128 wad)
+        note
+    {
         IOU.pull(msg.sender, wad);
         uint128 before = deposits[msg.sender];
         uint128 after_ = wsub(deposits[msg.sender], wad);
@@ -50,14 +48,15 @@ contract DSChiefApprovals is DSMath {
         GOV.push(msg.sender, wad);
         deposits[msg.sender] = after_;
         subWeight(wad, votes[msg.sender]);
-        LogLockFree(msg.sender, before, after_);
     }
 
-    function etch(address[] yays) returns (bytes32 slate) {
+    function etch(address[] yays)
+        note
+        returns (bytes32 slate)
+    {
         require( yays.length < MAX_YAYS );
         bytes32 hash = sha3(yays);
         slates[hash] = yays;
-        LogEtch(hash);
         return hash;
     }
     function addWeight(uint128 weight, bytes32 slate)
@@ -65,7 +64,7 @@ contract DSChiefApprovals is DSMath {
     {
         var yays = slates[slate];
         for( uint i = 0; i < yays.length; i++) {
-            approvals[yays[i]] = add(approvals[yays[i]], weight);
+            approvals[yays[i]] = wadd(approvals[yays[i]], weight);
         }
     }
     function subWeight(uint128 weight, bytes32 slate)
@@ -73,24 +72,29 @@ contract DSChiefApprovals is DSMath {
     {
         var yays = slates[slate];
         for( uint i = 0; i < yays.length; i++) {
-            approvals[yays[i]] = sub(approvals[yays[i]], weight);
+            approvals[yays[i]] = wsub(approvals[yays[i]], weight);
         }
     }
-    function vote(bytes32 slate) {
+    function vote(bytes32 slate)
+        note
+    {
         uint128 weight = deposits[msg.sender];
         subWeight(weight, votes[msg.sender]);
         votes[msg.sender] = slate;
         addWeight(weight, votes[msg.sender]);
     }
-    function vote(bytes32 slate, address lift_whom) {
+    function vote(bytes32 slate, address lift_whom)
+        note
+    {
         vote(slate);
         lift(lift_whom);
     }
     // like `drop`/`swap` except simply "elect this address if it is higher than current hat"
-    function lift(address whom) {
+    function lift(address whom)
+        note
+    {
         require(approvals[whom] > approvals[hat]);
         hat = whom;
-        LogLift(whom);
     }
 }
 

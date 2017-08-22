@@ -89,6 +89,7 @@ contract DSChiefApprovals is DSMath {
     function lift(address whom) {
         require(approvals[whom] > approvals[hat]);
         hat = whom;
+        LogLift(whom);
     }
 }
 

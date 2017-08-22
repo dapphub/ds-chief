@@ -39,6 +39,7 @@ contract DSChiefApprovals is DSMath {
         IOU.mint(wad);
         IOU.push(msg.sender, wad);
         deposits[msg.sender] = after_;
+        addWeight(wad, votes[msg.sender]);
         LogLockFree(msg.sender, before, after_);
     }
     function free(uint128 wad) {
@@ -48,6 +49,7 @@ contract DSChiefApprovals is DSMath {
         IOU.burn(wad);
         GOV.push(msg.sender, wad);
         deposits[msg.sender] = after_;
+        subWeight(wad, votes[msg.sender]);
         LogLockFree(msg.sender, before, after_);
     }
 
@@ -58,28 +60,27 @@ contract DSChiefApprovals is DSMath {
         LogEtch(hash);
         return hash;
     }
-    function addVote(bytes32 slate)
+    function addWeight(uint128 weight, bytes32 slate)
         internal
     {
-        uint128 weight = deposits[msg.sender];
         var yays = slates[slate];
-        for( uint i = 0; i < yays.length; i++ ) {
-            approvals[yays[i]] += weight;
+        for( uint i = 0; i < yays.length; i++) {
+            approvals[yays[i]] = add(approvals[yays[i]], weight);
         }
     }
-    function subVote(bytes32 slate)
+    function subWeight(uint128 weight, bytes32 slate)
         internal
     {
-        uint128 weight = deposits[msg.sender];
         var yays = slates[slate];
-        for( uint i = 0; i < yays.length; i++ ) {
-            approvals[yays[i]] -= weight;
+        for( uint i = 0; i < yays.length; i++) {
+            approvals[yays[i]] = sub(approvals[yays[i]], weight);
         }
     }
     function vote(bytes32 slate) {
-        subVote(votes[msg.sender]);
+        uint128 weight = deposits[msg.sender];
+        subWeight(weight, votes[msg.sender]);
         votes[msg.sender] = slate;
-        addVote(votes[msg.sender]);
+        addWeight(weight, votes[msg.sender]);
     }
     function vote(bytes32 slate, address lift_whom) {
         vote(slate);

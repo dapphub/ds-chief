@@ -31,7 +31,6 @@ contract DSChiefApprovals is DSThing {
         note
     {
         GOV.pull(msg.sender, wad);
-        uint128 before = deposits[msg.sender];
         uint128 after_ = wadd(deposits[msg.sender], wad);
         IOU.mint(wad);
         IOU.push(msg.sender, wad);
@@ -42,7 +41,6 @@ contract DSChiefApprovals is DSThing {
         note
     {
         IOU.pull(msg.sender, wad);
-        uint128 before = deposits[msg.sender];
         uint128 after_ = wsub(deposits[msg.sender], wad);
         IOU.burn(wad);
         GOV.push(msg.sender, wad);

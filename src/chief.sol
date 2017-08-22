@@ -60,22 +60,6 @@ contract DSChiefApprovals is DSMath {
         LogEtch(hash);
         return hash;
     }
-    function addWeight(uint128 weight, bytes32 slate)
-        internal
-    {
-        var yays = slates[slate];
-        for( uint i = 0; i < yays.length; i++) {
-            approvals[yays[i]] = add(approvals[yays[i]], weight);
-        }
-    }
-    function subWeight(uint128 weight, bytes32 slate)
-        internal
-    {
-        var yays = slates[slate];
-        for( uint i = 0; i < yays.length; i++) {
-            approvals[yays[i]] = sub(approvals[yays[i]], weight);
-        }
-    }
     function vote(bytes32 slate) {
         uint128 weight = deposits[msg.sender];
         subWeight(weight, votes[msg.sender]);
@@ -91,6 +75,22 @@ contract DSChiefApprovals is DSMath {
         require(approvals[whom] > approvals[hat]);
         hat = whom;
         LogLift(whom);
+    }
+    function addWeight(uint128 weight, bytes32 slate)
+        internal
+    {
+        var yays = slates[slate];
+        for( uint i = 0; i < yays.length; i++) {
+            approvals[yays[i]] = add(approvals[yays[i]], weight);
+        }
+    }
+    function subWeight(uint128 weight, bytes32 slate)
+        internal
+    {
+        var yays = slates[slate];
+        for( uint i = 0; i < yays.length; i++) {
+            approvals[yays[i]] = sub(approvals[yays[i]], weight);
+        }
     }
 }
 

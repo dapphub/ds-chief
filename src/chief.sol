@@ -52,7 +52,7 @@ contract DSChiefApprovals is DSThing {
         note
         returns (bytes32 slate)
     {
-        require( yays.length < MAX_YAYS );
+        require( yays.length <= MAX_YAYS );
         requireByteOrderedSet(yays);
 
         bytes32 hash = sha3(yays);

@@ -111,7 +111,9 @@ contract DSChiefApprovals is DSThing {
         }
     }
     // Throws unless the array of addresses is a ordered set.
-    function requireByteOrderedSet(address[] yays) internal {
+    function requireByteOrderedSet(address[] yays)
+        internal
+    {
         if( yays.length == 0 || yays.length == 1 ) {
             return;
         }

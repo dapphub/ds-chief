@@ -34,6 +34,16 @@ It's important to note that the voting token used in a `ds-chief` deployment
 must be specified at the time of deployment and cannot be changed afterward.
 
 
+## Notice for Client Implementations
+
+If you are writing a frontend for this smart contract, please note that the
+`address[]` parameters passed to the `etch` and `vote` functions must be
+_byte-ordered sets_. E.g., `[0x0, 0x1, 0x2, ...]` is valid, `[0x1, 0x0, ...]`
+and `[0x0, 0x0, 0x1, ...]` are not. This ordering constraint allows the contract
+to cheaply ensure voters cannot multiply their weights by listing the same
+candidate on their slate multiple times.
+
+
 ## APIs
 
 There are two contracts in `ds-chief`: `DSChiefApprovals` and `DSChief`, which
@@ -85,6 +95,20 @@ slate. Fires a `LogLockFree` event.
 ### `etch(address[] yays) returns (bytes32 slate)`
 
 Save a set of ordered addresses and return a unique identifier for it.
+
+
+### `vote(address[] yays) returns (bytes32 slate)`
+
+Save a set of ordered addresses as a slate, moves the voter's weight from their
+current slate to the new slate, and returns the slate's identifier.
+
+
+### `vote(address[] yays, address lift_whom) returns (bytes32 slate)`
+
+Save a set of ordered addresses as a slate, moves the voter's weight from their
+current slate to the new slate, elects `lift_whom` to the "chief" position
+(i.e., sets `hat` to `lift_whom`) if they now have more votes than the current
+chief, and returns the slate's identifier.
 
 
 ### `vote(bytes32 slate)`

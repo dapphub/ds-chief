@@ -53,6 +53,8 @@ contract DSChiefApprovals is DSThing {
         returns (bytes32 slate)
     {
         require( yays.length < MAX_YAYS );
+        requireByteOrderedSet(yays);
+
         bytes32 hash = sha3(yays);
         slates[hash] = yays;
         return hash;
@@ -106,6 +108,16 @@ contract DSChiefApprovals is DSThing {
         var yays = slates[slate];
         for( uint i = 0; i < yays.length; i++) {
             approvals[yays[i]] = wsub(approvals[yays[i]], weight);
+        }
+    }
+    // Throws unless the array of addresses is a ordered set.
+    function requireByteOrderedSet(address[] yays) internal {
+        if( yays.length == 0 || yays.length == 1 ) {
+            return;
+        }
+        for( uint i = 0; i < yays.length - 1; i++ ) {
+            // strict inequality ensures both ordering and uniqueness
+            require(uint256(bytes32(yays[i])) < uint256(bytes32(yays[i+1])));
         }
     }
 }

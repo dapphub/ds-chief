@@ -154,7 +154,8 @@ contract DSChief is DSRoles, DSChiefApprovals {
         return (who == hat);
     }
     function setRootUser(address who, bool enabled) {
-        throws();
+        who; enabled;
+        revert();
     }
 
 }

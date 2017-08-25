@@ -15,6 +15,17 @@ not be exchanged for the locked tokens except by someone who has actually locked
 funds in the contract, and only up to the amount they have locked.
 
 
+## Why an IOU Token?
+
+The IOU token allows for chaining governance contracts. An arbitrary number of
+`DSChief`, `DSPrism`, or other contracts of that kind may essentially use the
+same governance token by accepting the IOU token of the `DSChief` contract
+before it as a governance token. E.g., given three `DSChief` contracts,
+`chiefA`, `chiefB`, and `chiefC`, with `chiefA.GOV` being the `MKR` token,
+setting `chiefB.GOV` to `chiefA.IOU` and `chiefC.GOV` to `chiefB.IOU` allows all
+three contracts to essentially run using a common pool of `MKR`.
+
+
 ## Approval Voting
 
 **Approval voting** is when each voter selects which candidates they approve of,

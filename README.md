@@ -3,16 +3,30 @@
 
 ## Summary
 
-This contract provides a way to elect a "chief" via approval voting. This may be
-combined with another contract, such as `DSAuthority`, to elect an autocratic
-ruler over a smart contract system. Think of this as a
-[ds-prism](https://github.com/dapphub/ds-prism) optimized for electing a group
-of size 1.
+This contract provides a way to elect a "chief" contract via approval voting.
+This may be combined with another contract, such as `DSAuthority`, to elect a
+ruleset for a smart contract system.
 
-Voters lock up voting tokens to give their votes weight. In return, they are
-issued "IOU" tokens representing the tokens they have locked. The IOU tokens may
-not be exchanged for the locked tokens except by someone who has actually locked
-funds in the contract, and only up to the amount they have locked.
+Voters lock up voting tokens to give their votes weight. The voting mechanism is
+[approval voting](https://en.wikipedia.org/wiki/Approval_voting). Users get IOU
+tokens any time they lock voting tokens, which is useful for secondary mechisms.
+The IOU tokens may not be exchanged for the locked tokens except by someone who
+has actually locked funds in the contract, and only up to the amount they have locked.
+
+## Note on Chiefs
+
+Though anthropocentric language is used throughout this document when referring
+to the "chief," you should keep in mind that addresses can represent contracts
+as well as people. Thus, `ds-chief` works just as well as a method for selecting
+code for execution as it does for realizing political processes. For example,
+`ds-chief` could conceivably be used as a multisignature contract with
+token-weighted voting governing another set of smart contracts using `ds-auth`
+with `ds-roles`. In this scenario, "candidates" would consist of contracts
+mutating the state of the smart contract set under governance. Such a contract
+being elected "chief" would be granted all permissions to execute whatever
+changes necessary. `ds-chief` could also be used within such a contract
+set in conjunction with a proxy contract like `ds-proxy` or a name resolution
+system like ENS for the purpose of voting in new versions of contracts.
 
 
 ## Why an IOU Token?
@@ -44,21 +58,6 @@ token they've chosen to lock up in the `DSChief` or `DSChiefApprovals` contract.
 It's important to note that the voting token used in a `ds-chief` deployment
 must be specified at the time of deployment and cannot be changed afterward.
 
-
-## Note on Chiefs
-
-Though anthropocentric language is used throughout this document when referring
-to the "chief," you should keep in mind that addresses can represent contracts
-as well as people. Thus, `ds-chief` works just as well as a method for selecting
-code for execution as it does for realizing political processes. For example,
-`ds-chief` could conceivably be used as a multisignature contract with
-token-weighted voting governing another set of smart contracts using `ds-auth`
-with `ds-roles`. In this scenario, "candidates" would consist of contracts
-mutating the state of the smart contract set under governance. Such a contract
-being elected "chief" would be granted all permissions to execute whatever
-changes necessary. `ds-chief` could also be used within such a contract
-set in conjunction with a proxy contract like `ds-proxy` or a name resolution
-system like ENS for the purpose of voting in new versions of contracts.
 
 
 ## Notice for Client Implementations

@@ -1,3 +1,18 @@
+/*
+   Copyright 2017 DappHub, LLC
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
 pragma solidity ^0.4.15;
 
 import 'ds-token/token.sol';
@@ -31,21 +46,19 @@ contract DSChiefApprovals is DSThing {
         note
     {
         GOV.pull(msg.sender, wad);
-        uint128 after_ = wadd(deposits[msg.sender], wad);
         IOU.mint(wad);
         IOU.push(msg.sender, wad);
-        deposits[msg.sender] = after_;
+        deposits[msg.sender] = wadd(deposits[msg.sender], wad);
         addWeight(wad, votes[msg.sender]);
     }
     function free(uint128 wad)
         note
     {
+        deposits[msg.sender] = wsub(deposits[msg.sender], wad);
+        subWeight(wad, votes[msg.sender]);
         IOU.pull(msg.sender, wad);
-        uint128 after_ = wsub(deposits[msg.sender], wad);
         IOU.burn(wad);
         GOV.push(msg.sender, wad);
-        deposits[msg.sender] = after_;
-        subWeight(wad, votes[msg.sender]);
     }
 
     function etch(address[] yays)

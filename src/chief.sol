@@ -147,31 +147,14 @@ contract DSChief is DSRoles, DSChiefApprovals {
     {
     }
 
-    function getUserRoles(address who)
-        constant
-        returns (bytes32)
-    {
-        if( who == hat ) {
-            return BITNOT(0);
-        } else {
-            return super.getUserRoles(who);
-        }
-    }
     function isUserRoot(address who)
         constant
         returns (bool)
     {
-        return (who == hat) || super.isUserRoot(who);
-    }
-    // function getCapabilityRoles
-    // function isCapabilityPublic
-    function setUserRole(address who, uint8 role, bool enabled) {
-        require( role > 0 );
-        super.setUserRole(who, role, enabled);
+        return (who == hat);
     }
     function setRootUser(address who, bool enabled) {
-        require( who != hat || enabled == true ); // can't unset `hat`
-        super.setRootUser(who, enabled);
+        throws();
     }
 
 }

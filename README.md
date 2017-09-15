@@ -80,8 +80,8 @@ inherits from `DSChiefApprovals`.
 - `slates`: A mapping of `bytes32` to `address` arrays. Represents sets of
   candidates. Weighted votes are given to slates.
 - `votes`: A mapping of voter addresses to the slate they have voted for.
-- `approvals`: A mapping of candidate addresses to their `uint128` weight.
-- `deposits`: A mapping of voter addresses to `uint128` number of tokens locked.
+- `approvals`: A mapping of candidate addresses to their `uint` weight.
+- `deposits`: A mapping of voter addresses to `uint` number of tokens locked.
 - `GOV`: `DSToken` used for voting.
 - `IOU`: `DSToken` issued in exchange for locking `GOV` tokens.
 - `hat`: Contains the address of the current "chief."
@@ -89,11 +89,11 @@ inherits from `DSChiefApprovals`.
 
 It also provides the following events:
 
-- `LogLockFree(address indexed who, uint128 before, uint128 afterwards)`: Fired
+- `LogLockFree(address indexed who, uint before, uint afterwards)`: Fired
   when a user locks or unlocks their `GOV` tokens.
 - `LogEtch(bytes32 indexed slate)`: Fired when a slate is created.
-- `LogVote(address indexed who, bytes32 indexed slate, uint128 before, uint128
-  after)`: Fired when a user votes for a slate.
+- `LogVote(address indexed who, bytes32 indexed slate, uint before, uint after)`
+  : Fired when a user votes for a slate.
 - `LogLift(address indexed hat_)`: Fired when a new chief is elected.
 
 
@@ -104,14 +104,14 @@ Its public functions are as follows:
 The constructor.  Sets `GOV`, `IOU`, and `MAX_YAYS`.
 
 
-### `lock(uint128 wad)`
+### `lock(uint wad)`
 
 Charges the user `wad` `GOV` tokens, issues an equal amount of `IOU` tokens to
 the user, and adds `wad` weight to the candidates on the user's selected slate.
 Fires a `LogLockFree` event.
 
 
-### `free(uint128 wad)`
+### `free(uint wad)`
 
 Charges the user `wad` `IOU` tokens, issues an equal amount of `GOV` tokens to
 the user, and subtracts `wad` weight from the candidates on the user's selected

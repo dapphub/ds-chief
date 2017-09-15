@@ -24,7 +24,7 @@ import "./chief.sol";
 contract ChiefUser {
     DSChief chief;
 
-    function ChiefUser(DSToken token_, DSChief chief_) {
+    function ChiefUser(DSChief chief_) {
         chief = chief_;
     }
 
@@ -77,17 +77,17 @@ contract ChiefUser {
         chief.lift(to_lift);
     }
 
-    function doLock(uint128 amt) {
+    function doLock(uint amt) {
         chief.lock(amt);
     }
 
-    function doFree(uint128 amt) {
+    function doFree(uint amt) {
         chief.free(amt);
     }
 }
 
 contract DSChiefTest is DSTest {
-    uint constant electionSize = 3;
+    uint256 constant electionSize = 3;
 
     // c prefix: candidate
     address constant c1 = 0x1;
@@ -99,10 +99,10 @@ contract DSChiefTest is DSTest {
     address constant c7 = 0x7;
     address constant c8 = 0x8;
     address constant c9 = 0x9;
-    uint128 constant initialBalance = 1000 ether;
-    uint128 constant uLargeInitialBalance = initialBalance / 3;
-    uint128 constant uMediumInitialBalance = initialBalance / 4;
-    uint128 constant uSmallInitialBalance = initialBalance / 5;
+    uint256 constant initialBalance = 1000 ether;
+    uint256 constant uLargeInitialBalance = initialBalance / 3;
+    uint256 constant uMediumInitialBalance = initialBalance / 4;
+    uint256 constant uSmallInitialBalance = initialBalance / 5;
 
     DSChief chief;
     DSToken gov;
@@ -122,9 +122,9 @@ contract DSChiefTest is DSTest {
         chief = new DSChief(gov, iou, electionSize);
         iou.setOwner(chief);
 
-        uLarge = new ChiefUser(gov, chief);
-        uMedium = new ChiefUser(gov, chief);
-        uSmall = new ChiefUser(gov, chief);
+        uLarge = new ChiefUser(chief);
+        uMedium = new ChiefUser(chief);
+        uSmall = new ChiefUser(chief);
 
         assert(initialBalance > uLargeInitialBalance + uMediumInitialBalance +
                uSmallInitialBalance);

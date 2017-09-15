@@ -25,8 +25,8 @@ import 'ds-thing/thing.sol';
 contract DSChiefApprovals is DSThing {
     mapping(bytes32=>address[]) public slates;
     mapping(address=>bytes32) public votes;
-    mapping(address=>uint128) public approvals;
-    mapping(address=>uint128) public deposits;
+    mapping(address=>uint256) public approvals;
+    mapping(address=>uint256) public deposits;
     DSToken public GOV; // voting token that gets locked up
     DSToken public IOU; // non-voting representation of a token, for e.g. secondary voting mechanisms
     address public hat; // the chieftain's hat
@@ -42,22 +42,20 @@ contract DSChiefApprovals is DSThing {
         MAX_YAYS = MAX_YAYS_;
     }
 
-    function lock(uint128 wad)
+    function lock(uint wad)
         note
     {
         GOV.pull(msg.sender, wad);
-        IOU.mint(wad);
-        IOU.push(msg.sender, wad);
-        deposits[msg.sender] = wadd(deposits[msg.sender], wad);
+        IOU.mint(msg.sender, wad);
+        deposits[msg.sender] = add(deposits[msg.sender], wad);
         addWeight(wad, votes[msg.sender]);
     }
-    function free(uint128 wad)
+    function free(uint wad)
         note
     {
-        deposits[msg.sender] = wsub(deposits[msg.sender], wad);
+        deposits[msg.sender] = sub(deposits[msg.sender], wad);
         subWeight(wad, votes[msg.sender]);
-        IOU.pull(msg.sender, wad);
-        IOU.burn(wad);
+        IOU.burn(msg.sender, wad);
         GOV.push(msg.sender, wad);
     }
 
@@ -89,7 +87,7 @@ contract DSChiefApprovals is DSThing {
     function vote(bytes32 slate)
         note
     {
-        uint128 weight = deposits[msg.sender];
+        uint weight = deposits[msg.sender];
         subWeight(weight, votes[msg.sender]);
         votes[msg.sender] = slate;
         addWeight(weight, votes[msg.sender]);
@@ -107,20 +105,20 @@ contract DSChiefApprovals is DSThing {
         require(approvals[whom] > approvals[hat]);
         hat = whom;
     }
-    function addWeight(uint128 weight, bytes32 slate)
+    function addWeight(uint weight, bytes32 slate)
         internal
     {
         var yays = slates[slate];
         for( uint i = 0; i < yays.length; i++) {
-            approvals[yays[i]] = wadd(approvals[yays[i]], weight);
+            approvals[yays[i]] = add(approvals[yays[i]], weight);
         }
     }
-    function subWeight(uint128 weight, bytes32 slate)
+    function subWeight(uint weight, bytes32 slate)
         internal
     {
         var yays = slates[slate];
         for( uint i = 0; i < yays.length; i++) {
-            approvals[yays[i]] = wsub(approvals[yays[i]], weight);
+            approvals[yays[i]] = sub(approvals[yays[i]], weight);
         }
     }
     // Throws unless the array of addresses is a ordered set.
@@ -132,7 +130,7 @@ contract DSChiefApprovals is DSThing {
         }
         for( uint i = 0; i < yays.length - 1; i++ ) {
             // strict inequality ensures both ordering and uniqueness
-            require(uint256(bytes32(yays[i])) < uint256(bytes32(yays[i+1])));
+            require(uint(bytes32(yays[i])) < uint256(bytes32(yays[i+1])));
         }
     }
 }
@@ -157,7 +155,4 @@ contract DSChief is DSRoles, DSChiefApprovals {
         who; enabled;
         revert();
     }
-
 }
-
-

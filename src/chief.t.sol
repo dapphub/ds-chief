@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-pragma solidity ^0.4.15;
+pragma solidity ^0.4.17;
 
 import "ds-test/test.sol";
 import "ds-token/token.sol";
@@ -24,64 +24,68 @@ import "./chief.sol";
 contract ChiefUser {
     DSChief chief;
 
-    function ChiefUser(DSChief chief_) {
+    function ChiefUser(DSChief chief_) public {
         chief = chief_;
     }
 
     function doTransferFrom(DSToken token, address from, address to,
                             uint amount)
+        public
         returns (bool)
     {
         return token.transferFrom(from, to, amount);
     }
 
     function doTransfer(DSToken token, address to, uint amount)
+        public
         returns (bool)
     {
         return token.transfer(to, amount);
     }
 
     function doApprove(DSToken token, address recipient, uint amount)
+        public
         returns (bool)
     {
         return token.approve(recipient, amount);
     }
 
     function doAllowance(DSToken token, address owner, address spender)
+        public
         constant returns (uint)
     {
         return token.allowance(owner, spender);
     }
 
-    function doEtch(address[] guys) returns (bytes32) {
+    function doEtch(address[] guys) public returns (bytes32) {
         return chief.etch(guys);
     }
 
-    function doVote(address[] guys) returns (bytes32) {
+    function doVote(address[] guys) public returns (bytes32) {
         return chief.vote(guys);
     }
 
-    function doVote(address[] guys, address lift_whom) returns (bytes32) {
+    function doVote(address[] guys, address lift_whom) public returns (bytes32) {
         return chief.vote(guys, lift_whom);
     }
 
-    function doVote(bytes32 id) {
+    function doVote(bytes32 id) public {
         chief.vote(id);
     }
 
-    function doVote(bytes32 id, address lift_whom) {
+    function doVote(bytes32 id, address lift_whom) public {
         chief.vote(id, lift_whom);
     }
 
-    function doLift(address to_lift) {
+    function doLift(address to_lift) public {
         chief.lift(to_lift);
     }
 
-    function doLock(uint amt) {
+    function doLock(uint amt) public {
         chief.lock(amt);
     }
 
-    function doFree(uint amt) {
+    function doFree(uint amt) public {
         chief.free(amt);
     }
 }
@@ -113,7 +117,7 @@ contract DSChiefTest is DSTest {
     ChiefUser uMedium;
     ChiefUser uSmall;
 
-    function setUp() {
+    function setUp() public {
         gov = new DSToken("GOV");
         gov.mint(initialBalance);
 
@@ -135,15 +139,15 @@ contract DSChiefTest is DSTest {
         gov.transfer(uSmall, uSmallInitialBalance);
     }
 
-    function test_basic_sanity() {
+    function test_basic_sanity() public pure {
         assert(true);
     }
 
-    function testFail_basic_sanity() {
+    function testFail_basic_sanity() public pure {
         assert(false);
     }
 
-    function test_etch_returns_same_id_for_same_sets() {
+    function test_etch_returns_same_id_for_same_sets() public {
         var candidates = new address[](3);
         candidates[0] = c1;
         candidates[1] = c2;
@@ -154,19 +158,19 @@ contract DSChiefTest is DSTest {
         assertEq32(id, uMedium.doEtch(candidates));
     }
 
-    function test_size_zero_slate() {
+    function test_size_zero_slate() public {
         var candidates = new address[](0);
         var id = uSmall.doEtch(candidates);
         uSmall.doVote(id);
     }
-    function test_size_one_slate() {
+    function test_size_one_slate() public {
         var candidates = new address[](1);
         candidates[0] = c1;
         var id = uSmall.doEtch(candidates);
         uSmall.doVote(id);
     }
 
-    function testFail_etch_requires_ordered_sets() {
+    function testFail_etch_requires_ordered_sets() public {
         var candidates = new address[](3);
         candidates[0] = c2;
         candidates[1] = c1;
@@ -175,7 +179,7 @@ contract DSChiefTest is DSTest {
         uSmall.doEtch(candidates);
     }
 
-    function test_lock_debits_user() {
+    function test_lock_debits_user() public {
         assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
 
         var lockedAmt = uLargeInitialBalance / 10;
@@ -186,7 +190,7 @@ contract DSChiefTest is DSTest {
                lockedAmt);
     }
 
-    function test_changing_weight_after_voting() {
+    function test_changing_weight_after_voting() public {
         var uLargeLockedAmt = uLargeInitialBalance / 2;
         uLarge.doApprove(iou, chief, uLargeLockedAmt);
         uLarge.doApprove(gov, chief, uLargeLockedAmt);
@@ -209,7 +213,7 @@ contract DSChiefTest is DSTest {
         assert(chief.approvals(c1) == uLargeLockedAmt);
     }
 
-    function test_voting_and_reordering() {
+    function test_voting_and_reordering() public {
         assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
 
         initial_vote();
@@ -224,7 +228,7 @@ contract DSChiefTest is DSTest {
         uLarge.doVote(uLargeSlate);
     }
 
-    function testFail_lift_while_out_of_order() {
+    function testFail_lift_while_out_of_order() public {
         initial_vote();
 
         // Upset the order.
@@ -240,7 +244,7 @@ contract DSChiefTest is DSTest {
         chief.lift(c3);
     }
 
-    function test_lift_half_approvals() {
+    function test_lift_half_approvals() public {
         initial_vote();
 
         // Upset the order.
@@ -261,7 +265,7 @@ contract DSChiefTest is DSTest {
         assert(chief.isUserRoot(c3));
     }
 
-    function testFail_voting_and_reordering_without_weight() {
+    function testFail_voting_and_reordering_without_weight() public {
         assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
 
         initial_vote();
@@ -275,7 +279,7 @@ contract DSChiefTest is DSTest {
         chief.lift(c3);
     }
 
-    function test_voting_by_slate_id() {
+    function test_voting_by_slate_id() public {
         assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
 
         var slateID = initial_vote();

@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-pragma solidity ^0.4.15;
+pragma solidity ^0.4.17;
 
 import 'ds-token/token.sol';
 import 'ds-roles/roles.sol';
@@ -35,7 +35,7 @@ contract DSChiefApprovals is DSThing {
 
     // IOU constructed outside this contract reduces deployment costs significantly
     // lock/free/vote are quite sensitive to token invariants. Caution is advised.
-    function DSChiefApprovals(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_)
+    function DSChiefApprovals(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_) public
     {
         GOV = GOV_;
         IOU = IOU_;
@@ -43,6 +43,7 @@ contract DSChiefApprovals is DSThing {
     }
 
     function lock(uint wad)
+        public
         note
     {
         GOV.pull(msg.sender, wad);
@@ -51,6 +52,7 @@ contract DSChiefApprovals is DSThing {
         addWeight(wad, votes[msg.sender]);
     }
     function free(uint wad)
+        public
         note
     {
         deposits[msg.sender] = sub(deposits[msg.sender], wad);
@@ -60,24 +62,25 @@ contract DSChiefApprovals is DSThing {
     }
 
     function etch(address[] yays)
+        public
         note
         returns (bytes32 slate)
     {
         require( yays.length <= MAX_YAYS );
         requireByteOrderedSet(yays);
 
-        bytes32 hash = sha3(yays);
+        bytes32 hash = keccak256(yays);
         slates[hash] = yays;
         return hash;
     }
-    function vote(address[] guys) returns (bytes32)
+    function vote(address[] guys) public returns (bytes32)
         // note  both sub-calls note
     {
         var slate = etch(guys);
         vote(slate);
         return slate;
     }
-    function vote(address[] guys, address lift_whom) returns (bytes32)
+    function vote(address[] guys, address lift_whom) public returns (bytes32)
         // note  both sub-calls note
     {
         var slate = vote(guys);
@@ -85,6 +88,7 @@ contract DSChiefApprovals is DSThing {
         return slate;
     }
     function vote(bytes32 slate)
+        public
         note
     {
         uint weight = deposits[msg.sender];
@@ -93,6 +97,7 @@ contract DSChiefApprovals is DSThing {
         addWeight(weight, votes[msg.sender]);
     }
     function vote(bytes32 slate, address lift_whom)
+        public
         // note  both sub-calls note
     {
         vote(slate);
@@ -100,6 +105,7 @@ contract DSChiefApprovals is DSThing {
     }
     // like `drop`/`swap` except simply "elect this address if it is higher than current hat"
     function lift(address whom)
+        public
         note
     {
         require(approvals[whom] > approvals[hat]);
@@ -124,6 +130,7 @@ contract DSChiefApprovals is DSThing {
     // Throws unless the array of addresses is a ordered set.
     function requireByteOrderedSet(address[] yays)
         internal
+        pure
     {
         if( yays.length == 0 || yays.length == 1 ) {
             return;
@@ -142,16 +149,18 @@ contract DSChief is DSRoles, DSChiefApprovals {
 
     function DSChief(DSToken GOV, DSToken IOU, uint MAX_YAYS)
              DSChiefApprovals (GOV, IOU, MAX_YAYS)
+        public
     {
     }
 
     function isUserRoot(address who)
+        public
         constant
         returns (bool)
     {
         return (who == hat);
     }
-    function setRootUser(address who, bool enabled) {
+    function setRootUser(address who, bool enabled) public {
         who; enabled;
         revert();
     }

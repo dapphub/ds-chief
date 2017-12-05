@@ -17,9 +17,8 @@
 
 pragma solidity ^0.4.15;
 
-import 'ds-thing/thing.sol';
 
-contract ActionHat is DSThing {
+contract ActionHat {
     address public target;
     uint256 public value;
     bytes   public data;
@@ -29,7 +28,7 @@ contract ActionHat is DSThing {
         value = value_;
         data = data_;
     }
-    function fire() auth { // TODO auth?
+    function fire() {
         require(!done);
         target.call.value(value)(data);
         done = true;
@@ -38,9 +37,7 @@ contract ActionHat is DSThing {
 
 contract ActionHatFactory {
     function make(address target, uint256 value, bytes data) returns (ActionHat) {
-        var A = new ActionHat(target, value, data);
-        A.setOwner(msg.sender);
-        return A;
+        return new ActionHat(target, value, data);
     }
 }
 

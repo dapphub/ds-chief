@@ -153,6 +153,18 @@ contract DSChief is DSRoles, DSChiefApprovals {
              DSChiefApprovals (GOV, IOU, MAX_YAYS)
         public
     {
+        authority = this;
+        owner  = 0;
+    }
+
+    function setOwner(address owner_) {
+        owner_;
+        revert();
+    }
+
+    function setAuthority(DSAuthority authority_) {
+        authority_;
+        revert();
     }
 
     function isUserRoot(address who)

@@ -19,11 +19,12 @@ pragma solidity ^0.4.17;
 
 import "ds-test/test.sol";
 import "ds-token/token.sol";
+import "ds-thing/thing.sol";
 
+import "./action.sol";
 import "./chief.sol";
 
-
-contract ChiefUser {
+contract ChiefUser is DSThing {
     DSChief chief;
 
     function ChiefUser(DSChief chief_) public {
@@ -90,9 +91,25 @@ contract ChiefUser {
     function doFree(uint amt) public {
         chief.free(amt);
     }
+
+    function doSetUserRole(address who, uint8 role, bool enabled) public {
+        chief.setUserRole(who, role, enabled);
+    }
+
+    function doSetRoleCapability(uint8 role, address code, bytes4 sig, bool enabled) public {
+        chief.setRoleCapability(role, code, sig, enabled);
+    }
+
+    function doSetPublicCapability(address code, bytes4 sig, bool enabled) public {
+        chief.setPublicCapability(code, sig, enabled);
+    }
+
+    function authedFn() auth returns (bool) {
+        return true;
+    }
 }
 
-contract DSChiefTest is DSTest {
+contract DSChiefTest is DSThing, DSTest {
     uint256 constant electionSize = 3;
 
     // c prefix: candidate
@@ -304,6 +321,71 @@ contract DSChiefTest is DSTest {
 
         // Update the elected set to reflect the restored order.
         chief.lift(c1);
+    }
+
+    function testFail_non_hat_can_not_set_roles() public {
+        uSmall.doSetUserRole(uMedium, 1, true);
+    }
+
+    function test_hat_can_set_roles() public {
+        var slate = new address[](1);
+        slate[0] = uSmall;
+
+        // Upset the order.
+        uLarge.doApprove(gov, chief, uLargeInitialBalance);
+        uLarge.doLock(uLargeInitialBalance);
+
+        uLarge.doVote(slate);
+
+        // Update the elected set to reflect the new order.
+        chief.lift(uSmall);
+
+        uSmall.doSetUserRole(uMedium, 1, true);
+    }
+
+    function testFail_non_hat_can_not_role_capability() public {
+        uSmall.doSetRoleCapability(1, uMedium, S("authedFn"), true);
+    }
+
+    function test_hat_can_set_role_capability() public {
+        var slate = new address[](1);
+        slate[0] = uSmall;
+
+        // Upset the order.
+        uLarge.doApprove(gov, chief, uLargeInitialBalance);
+        uLarge.doLock(uLargeInitialBalance);
+
+        uLarge.doVote(slate);
+
+        // Update the elected set to reflect the new order.
+        chief.lift(uSmall);
+
+        uSmall.doSetRoleCapability(1, uLarge, S("authedFn()"), true);
+        uSmall.doSetUserRole(this, 1, true);
+
+        uLarge.setAuthority(chief);
+        uLarge.setOwner(0);
+        uLarge.authedFn();
+    }
+
+    function test_hat_can_set_public_capability() public {
+        var slate = new address[](1);
+        slate[0] = uSmall;
+
+        // Upset the order.
+        uLarge.doApprove(gov, chief, uLargeInitialBalance);
+        uLarge.doLock(uLargeInitialBalance);
+
+        uLarge.doVote(slate);
+
+        // Update the elected set to reflect the new order.
+        chief.lift(uSmall);
+
+        uSmall.doSetPublicCapability(uLarge, S("authedFn()"), true);
+
+        uLarge.setAuthority(chief);
+        uLarge.setOwner(0);
+        uLarge.authedFn();
     }
 
     function initial_vote() internal returns (bytes32 slateID) {

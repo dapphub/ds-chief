@@ -157,12 +157,12 @@ contract DSChief is DSRoles, DSChiefApprovals {
         owner  = 0;
     }
 
-    function setOwner(address owner_) {
+    function setOwner(address owner_) public {
         owner_;
         revert();
     }
 
-    function setAuthority(DSAuthority authority_) {
+    function setAuthority(DSAuthority authority_) public {
         authority_;
         revert();
     }

@@ -161,11 +161,11 @@ The constructor.  Sets `GOV`, `IOU`, and `MAX_YAYS`.
 
 ### `setOwner(address owner_)`
 
-Reverts the transaction. Overridden from `DSAuth`. 
+Reverts the transaction. Overridden from `DSAuth`.
 
 ### `setAuthority(DSAuthority authority_)`
 
-Reverts the transaction. Overridden from `DSAuth`. 
+Reverts the transaction. Overridden from `DSAuth`.
 
 
 ### `isUserRoot(address who) constant returns (bool)`
@@ -175,7 +175,7 @@ Returns `true` if the given address is the chief.
 
 ### `setRootUser(address who, bool enabled)`
 
-Reverts the transaction. Overridden from `DSRoles`. 
+Reverts the transaction. Overridden from `DSRoles`.
 
 ### DSRoles
 

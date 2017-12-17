@@ -53,6 +53,7 @@ contract DSChiefApprovals is DSThing {
         deposits[msg.sender] = add(deposits[msg.sender], wad);
         addWeight(wad, votes[msg.sender]);
     }
+
     function free(uint wad)
         public
         note
@@ -75,6 +76,7 @@ contract DSChiefApprovals is DSThing {
         slates[hash] = yays;
         return hash;
     }
+
     function vote(address[] yays) public returns (bytes32)
         // note  both sub-calls note
     {
@@ -82,13 +84,7 @@ contract DSChiefApprovals is DSThing {
         vote(slate);
         return slate;
     }
-    function vote(address[] yays, address lift_whom) public returns (bytes32)
-        // note  both sub-calls note
-    {
-        var slate = vote(yays);
-        lift(lift_whom);
-        return slate;
-    }
+
     function vote(bytes32 slate)
         public
         note
@@ -98,13 +94,7 @@ contract DSChiefApprovals is DSThing {
         votes[msg.sender] = slate;
         addWeight(weight, votes[msg.sender]);
     }
-    function vote(bytes32 slate, address lift_whom)
-        public
-        // note  both sub-calls note
-    {
-        vote(slate);
-        lift(lift_whom);
-    }
+
     // like `drop`/`swap` except simply "elect this address if it is higher than current hat"
     function lift(address whom)
         public
@@ -113,6 +103,7 @@ contract DSChiefApprovals is DSThing {
         require(approvals[whom] > approvals[hat]);
         hat = whom;
     }
+
     function addWeight(uint weight, bytes32 slate)
         internal
     {
@@ -121,6 +112,7 @@ contract DSChiefApprovals is DSThing {
             approvals[yays[i]] = add(approvals[yays[i]], weight);
         }
     }
+
     function subWeight(uint weight, bytes32 slate)
         internal
     {
@@ -129,6 +121,7 @@ contract DSChiefApprovals is DSThing {
             approvals[yays[i]] = sub(approvals[yays[i]], weight);
         }
     }
+
     // Throws unless the array of addresses is a ordered set.
     function requireByteOrderedSet(address[] yays)
         internal
@@ -154,7 +147,7 @@ contract DSChief is DSRoles, DSChiefApprovals {
         public
     {
         authority = this;
-        owner  = 0;
+        owner = 0;
     }
 
     function setOwner(address owner_) public {

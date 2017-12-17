@@ -69,7 +69,9 @@ contract ChiefUser is DSThing {
     }
 
     function doVote(address[] guys, address lift_whom) public returns (bytes32) {
-        return chief.vote(guys, lift_whom);
+        var slate = chief.vote(guys);
+        chief.lift(lift_whom);
+        return slate;
     }
 
     function doVote(bytes32 id) public {
@@ -77,7 +79,8 @@ contract ChiefUser is DSThing {
     }
 
     function doVote(bytes32 id, address lift_whom) public {
-        chief.vote(id, lift_whom);
+        chief.vote(id);
+        chief.lift(lift_whom);
     }
 
     function doLift(address to_lift) public {
@@ -386,6 +389,10 @@ contract DSChiefTest is DSThing, DSTest {
         uLarge.setAuthority(chief);
         uLarge.setOwner(0);
         uLarge.authedFn();
+    }
+
+    function test_chief_no_owner() public {
+        assertEq(chief.owner(), 0);
     }
 
     function initial_vote() internal returns (bytes32 slateID) {

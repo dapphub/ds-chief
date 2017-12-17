@@ -21,7 +21,6 @@ import "ds-test/test.sol";
 import "ds-token/token.sol";
 import "ds-thing/thing.sol";
 
-import "./action.sol";
 import "./chief.sol";
 
 contract ChiefUser is DSThing {

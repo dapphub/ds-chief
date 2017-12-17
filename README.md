@@ -9,7 +9,7 @@ ruleset for a smart contract system.
 
 Voters lock up voting tokens to give their votes weight. The voting mechanism is
 [approval voting](https://en.wikipedia.org/wiki/Approval_voting). Users get IOU
-tokens any time they lock voting tokens, which is useful for secondary mechisms.
+tokens any time they lock voting tokens, which is useful for secondary governance mechanisms.
 The IOU tokens may not be exchanged for the locked tokens except by someone who
 has actually locked funds in the contract, and only up to the amount they have locked.
 
@@ -159,25 +159,24 @@ Its public functions are as follows:
 
 The constructor.  Sets `GOV`, `IOU`, and `MAX_YAYS`.
 
+### `setOwner(address owner_)`
 
-### `getUserRoles(address who) constant returns (bytes32)`
+Reverts the transaction. Overridden from `DSAuth`. 
 
-Overrides `DSRoles.getUserRoles` to return the maximum `bytes32` value if the
-address of the current chief is given. This means the chief has all roles.
+### `setAuthority(DSAuthority authority_)`
+
+Reverts the transaction. Overridden from `DSAuth`. 
 
 
 ### `isUserRoot(address who) constant returns (bool)`
 
-Returns `true` if the given address is the chief, reverts to a normal `DSRoles`
-check otherwise.
-
-
-### `setUserRole(address who, uint8 role, bool enabled)`
-
-Throws if `role` is `<= 0`, otherwise passes the call up to `DSRoles`.
+Returns `true` if the given address is the chief.
 
 
 ### `setRootUser(address who, bool enabled)`
 
-Ensures that the user is not trying to remove the `root` role from the "chief,"
-then passes the call up to `DSRoles`.
+Reverts the transaction. Overridden from `DSRoles`. 
+
+### DSRoles
+
+See [ds-roles](https://dapp.tools/dappsys/ds-roles.html) for inherited features.

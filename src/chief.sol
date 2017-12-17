@@ -175,3 +175,11 @@ contract DSChief is DSRoles, DSChiefApprovals {
         revert();
     }
 }
+
+contract DSChiefFab {
+    function newChief(DSToken gov, uint MAX_YAYS) public returns (DSChief chief) {
+        DSToken iou = new DSToken('IOU');
+        chief = new DSChief(gov, iou, MAX_YAYS);
+        iou.setOwner(chief);
+    }
+}

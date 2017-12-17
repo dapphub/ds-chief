@@ -143,10 +143,9 @@ contract DSChiefTest is DSThing, DSTest {
         gov = new DSToken("GOV");
         gov.mint(initialBalance);
 
-        iou = new DSToken("IOU");
-
-        chief = new DSChief(gov, iou, electionSize);
-        iou.setOwner(chief);
+        var fab = new DSChiefFab();
+        chief = fab.newChief(gov, electionSize);
+        iou = chief.IOU();
 
         uLarge = new ChiefUser(chief);
         uMedium = new ChiefUser(chief);

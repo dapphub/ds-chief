@@ -123,23 +123,10 @@ Save a set of ordered addresses as a slate, moves the voter's weight from their
 current slate to the new slate, and returns the slate's identifier.
 
 
-### `vote(address[] yays, address lift_whom) returns (bytes32 slate)`
-
-Save a set of ordered addresses as a slate, moves the voter's weight from their
-current slate to the new slate, elects `lift_whom` to the "chief" position
-(i.e., sets `hat` to `lift_whom`) if they now have more votes than the current
-chief, and returns the slate's identifier.
-
-
 ### `vote(bytes32 slate)`
 
 Removes voter's weight from their current slate and adds it to the specified
 slate.
-
-
-### `vote(bytes32 slate, address lift_whom)`
-
-Calls `vote(bytes32 slate)` and then `lift(address whom)`.
 
 
 ### `lift(address whom)`

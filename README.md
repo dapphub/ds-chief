@@ -87,15 +87,9 @@ inherits from `DSChiefApprovals`.
 - `hat`: Contains the address of the current "chief."
 - `MAX_YAYS`: Maximum number of candidates a slate can hold.
 
-It also provides the following events:
+Most of the functions are decorated with the the `note` modifier from [ds-note](https://dapp.tools/dappsys/ds-note.html), meaning that they fire a standardized event when called. Additionally, one custom event is also provided:
 
-- `LogLockFree(address indexed who, uint before, uint afterwards)`: Fired
-  when a user locks or unlocks their `GOV` tokens.
-- `LogEtch(bytes32 indexed slate)`: Fired when a slate is created.
-- `LogVote(address indexed who, bytes32 indexed slate, uint before, uint after)`
-  : Fired when a user votes for a slate.
-- `LogLift(address indexed hat_)`: Fired when a new chief is elected.
-
+- `Etch(bytes32 indexed slate)`: Fired when a slate is created.
 
 Its public functions are as follows:
 

@@ -35,6 +35,8 @@ contract DSChiefApprovals is DSThing {
 
     uint256 public MAX_YAYS;
 
+    event Etch(bytes32 indexed slate);
+
     // IOU constructed outside this contract reduces deployment costs significantly
     // lock/free/vote are quite sensitive to token invariants. Caution is advised.
     function DSChiefApprovals(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_) public
@@ -74,6 +76,7 @@ contract DSChiefApprovals is DSThing {
 
         bytes32 hash = keccak256(yays);
         slates[hash] = yays;
+        Etch(hash);
         return hash;
     }
 

@@ -106,7 +106,7 @@ contract ChiefUser is DSThing {
         chief.setPublicCapability(code, sig, enabled);
     }
 
-    function authedFn() auth returns (bool) {
+    function authedFn() public view auth returns (bool) {
         return true;
     }
 }

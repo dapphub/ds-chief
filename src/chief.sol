@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity ^0.4.17;
+pragma solidity ^0.4.23;
 
 import 'ds-token/token.sol';
 import 'ds-roles/roles.sol';
@@ -39,7 +39,7 @@ contract DSChiefApprovals is DSThing {
 
     // IOU constructed outside this contract reduces deployment costs significantly
     // lock/free/vote are quite sensitive to token invariants. Caution is advised.
-    function DSChiefApprovals(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_) public
+    constructor(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_) public
     {
         GOV = GOV_;
         IOU = IOU_;
@@ -76,14 +76,14 @@ contract DSChiefApprovals is DSThing {
 
         bytes32 hash = keccak256(yays);
         slates[hash] = yays;
-        Etch(hash);
+        emit Etch(hash);
         return hash;
     }
 
     function vote(address[] yays) public returns (bytes32)
         // note  both sub-calls note
     {
-        var slate = etch(yays);
+        bytes32 slate = etch(yays);
         vote(slate);
         return slate;
     }
@@ -110,7 +110,7 @@ contract DSChiefApprovals is DSThing {
     function addWeight(uint weight, bytes32 slate)
         internal
     {
-        var yays = slates[slate];
+        address[] storage yays = slates[slate];
         for( uint i = 0; i < yays.length; i++) {
             approvals[yays[i]] = add(approvals[yays[i]], weight);
         }
@@ -119,7 +119,7 @@ contract DSChiefApprovals is DSThing {
     function subWeight(uint weight, bytes32 slate)
         internal
     {
-        var yays = slates[slate];
+        address[] storage yays = slates[slate];
         for( uint i = 0; i < yays.length; i++) {
             approvals[yays[i]] = sub(approvals[yays[i]], weight);
         }
@@ -145,7 +145,7 @@ contract DSChiefApprovals is DSThing {
 // unique owner of role 0 (typically 'sys' or 'internal')
 contract DSChief is DSRoles, DSChiefApprovals {
 
-    function DSChief(DSToken GOV, DSToken IOU, uint MAX_YAYS)
+    constructor(DSToken GOV, DSToken IOU, uint MAX_YAYS)
              DSChiefApprovals (GOV, IOU, MAX_YAYS)
         public
     {

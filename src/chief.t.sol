@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity ^0.4.17;
+pragma solidity ^0.4.23;
 
 import "ds-test/test.sol";
 import "ds-token/token.sol";
@@ -26,7 +26,7 @@ import "./chief.sol";
 contract ChiefUser is DSThing {
     DSChief chief;
 
-    function ChiefUser(DSChief chief_) public {
+    constructor(DSChief chief_) public {
         chief = chief_;
     }
 
@@ -68,7 +68,7 @@ contract ChiefUser is DSThing {
     }
 
     function doVote(address[] guys, address lift_whom) public returns (bytes32) {
-        var slate = chief.vote(guys);
+        bytes32 slate = chief.vote(guys);
         chief.lift(lift_whom);
         return slate;
     }
@@ -142,7 +142,7 @@ contract DSChiefTest is DSThing, DSTest {
         gov = new DSToken("GOV");
         gov.mint(initialBalance);
 
-        var fab = new DSChiefFab();
+        DSChiefFab fab = new DSChiefFab();
         chief = fab.newChief(gov, electionSize);
         iou = chief.IOU();
 
@@ -168,30 +168,30 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_etch_returns_same_id_for_same_sets() public {
-        var candidates = new address[](3);
+        address[] memory candidates = new address[](3);
         candidates[0] = c1;
         candidates[1] = c2;
         candidates[2] = c3;
 
-        var id = uSmall.doEtch(candidates);
+        bytes32 id = uSmall.doEtch(candidates);
         assert(id != 0x0);
         assertEq32(id, uMedium.doEtch(candidates));
     }
 
     function test_size_zero_slate() public {
-        var candidates = new address[](0);
-        var id = uSmall.doEtch(candidates);
+        address[] memory candidates = new address[](0);
+        bytes32 id = uSmall.doEtch(candidates);
         uSmall.doVote(id);
     }
     function test_size_one_slate() public {
-        var candidates = new address[](1);
+        address[] memory candidates = new address[](1);
         candidates[0] = c1;
-        var id = uSmall.doEtch(candidates);
+        bytes32 id = uSmall.doEtch(candidates);
         uSmall.doVote(id);
     }
 
     function testFail_etch_requires_ordered_sets() public {
-        var candidates = new address[](3);
+        address[] memory candidates = new address[](3);
         candidates[0] = c2;
         candidates[1] = c1;
         candidates[2] = c3;
@@ -202,7 +202,7 @@ contract DSChiefTest is DSThing, DSTest {
     function test_lock_debits_user() public {
         assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
 
-        var lockedAmt = uLargeInitialBalance / 10;
+        uint lockedAmt = uLargeInitialBalance / 10;
         uLarge.doApprove(gov, chief, lockedAmt);
         uLarge.doLock(lockedAmt);
 
@@ -211,12 +211,12 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_changing_weight_after_voting() public {
-        var uLargeLockedAmt = uLargeInitialBalance / 2;
+        uint uLargeLockedAmt = uLargeInitialBalance / 2;
         uLarge.doApprove(iou, chief, uLargeLockedAmt);
         uLarge.doApprove(gov, chief, uLargeLockedAmt);
         uLarge.doLock(uLargeLockedAmt);
 
-        var uLargeSlate = new address[](1);
+        address[] memory uLargeSlate = new address[](1);
         uLargeSlate[0] = c1;
         uLarge.doVote(uLargeSlate);
 
@@ -239,11 +239,11 @@ contract DSChiefTest is DSThing, DSTest {
         initial_vote();
 
         // Upset the order.
-        var uLargeLockedAmt = uLargeInitialBalance;
+        uint uLargeLockedAmt = uLargeInitialBalance;
         uLarge.doApprove(gov, chief, uLargeLockedAmt);
         uLarge.doLock(uLargeLockedAmt);
 
-        var uLargeSlate = new address[](1);
+        address[] memory uLargeSlate = new address[](1);
         uLargeSlate[0] = c3;
         uLarge.doVote(uLargeSlate);
     }
@@ -255,7 +255,7 @@ contract DSChiefTest is DSThing, DSTest {
         uSmall.doApprove(gov, chief, uSmallInitialBalance);
         uSmall.doLock(uSmallInitialBalance);
 
-        var uSmallSlate = new address[](1);
+        address[] memory uSmallSlate = new address[](1);
         uSmallSlate[0] = c3;
         uSmall.doVote(uSmallSlate);
 
@@ -271,7 +271,7 @@ contract DSChiefTest is DSThing, DSTest {
         uSmall.doApprove(gov, chief, uSmallInitialBalance);
         uSmall.doLock(uSmallInitialBalance);
 
-        var uSmallSlate = new address[](1);
+        address[] memory uSmallSlate = new address[](1);
         uSmallSlate[0] = c3;
         uSmall.doVote(uSmallSlate);
 
@@ -291,7 +291,7 @@ contract DSChiefTest is DSThing, DSTest {
         initial_vote();
 
         // Vote without weight.
-        var uLargeSlate = new address[](1);
+        address[] memory uLargeSlate = new address[](1);
         uLargeSlate[0] = c3;
         uLarge.doVote(uLargeSlate);
 
@@ -302,13 +302,13 @@ contract DSChiefTest is DSThing, DSTest {
     function test_voting_by_slate_id() public {
         assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
 
-        var slateID = initial_vote();
+        bytes32 slateID = initial_vote();
 
         // Upset the order.
         uLarge.doApprove(gov, chief, uLargeInitialBalance);
         uLarge.doLock(uLargeInitialBalance);
 
-        var uLargeSlate = new address[](1);
+        address[] memory uLargeSlate = new address[](1);
         uLargeSlate[0] = c4;
         uLarge.doVote(uLargeSlate);
 
@@ -329,7 +329,7 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_hat_can_set_roles() public {
-        var slate = new address[](1);
+        address[] memory slate = new address[](1);
         slate[0] = uSmall;
 
         // Upset the order.
@@ -349,7 +349,7 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_hat_can_set_role_capability() public {
-        var slate = new address[](1);
+        address[] memory slate = new address[](1);
         slate[0] = uSmall;
 
         // Upset the order.
@@ -370,7 +370,7 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_hat_can_set_public_capability() public {
-        var slate = new address[](1);
+        address[] memory slate = new address[](1);
         slate[0] = uSmall;
 
         // Upset the order.
@@ -394,11 +394,11 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function initial_vote() internal returns (bytes32 slateID) {
-        var uMediumLockedAmt = uMediumInitialBalance;
+        uint uMediumLockedAmt = uMediumInitialBalance;
         uMedium.doApprove(gov, chief, uMediumLockedAmt);
         uMedium.doLock(uMediumLockedAmt);
 
-        var uMediumSlate = new address[](3);
+        address[] memory uMediumSlate = new address[](3);
         uMediumSlate[0] = c1;
         uMediumSlate[1] = c2;
         uMediumSlate[2] = c3;

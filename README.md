@@ -44,11 +44,7 @@ three contracts to essentially run using a common pool of `MKR`.
 
 **Approval voting** is when each voter selects which candidates they approve of,
 with the top `n` "most approved" candidates being elected. Each voter can cast
-up to `n + k` votes, where `k` is some non-zero positive integer. This allows
-voters to move their approval from one candidate to another without needing to
-first withdraw support from the candidate being replaced. Without this, moving
-approval to a new candidate could result in a less-approved candidate moving
-momentarily into the set of elected candidates.
+up to `n + k` votes, where `k` is some non-zero positive integer.
 
 In the case of `ds-chief`, `n` is 1.
 

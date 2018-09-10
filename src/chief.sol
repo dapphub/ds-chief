@@ -74,7 +74,7 @@ contract DSChiefApprovals is DSThing {
         require( yays.length <= MAX_YAYS );
         requireByteOrderedSet(yays);
 
-        bytes32 hash = keccak256(yays);
+        bytes32 hash = keccak256(abi.encodePacked(yays));
         slates[hash] = yays;
         emit Etch(hash);
         return hash;

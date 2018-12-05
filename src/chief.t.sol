@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity ^0.4.23;
+pragma solidity >=0.4.23;
 
 import "ds-test/test.sol";
 import "ds-token/token.sol";
@@ -53,21 +53,21 @@ contract ChiefUser is DSThing {
     }
 
     function doAllowance(DSToken token, address owner, address spender)
-        public
-        constant returns (uint)
+        public view
+        returns (uint)
     {
         return token.allowance(owner, spender);
     }
 
-    function doEtch(address[] guys) public returns (bytes32) {
+    function doEtch(address[] memory guys) public returns (bytes32) {
         return chief.etch(guys);
     }
 
-    function doVote(address[] guys) public returns (bytes32) {
+    function doVote(address[] memory guys) public returns (bytes32) {
         return chief.vote(guys);
     }
 
-    function doVote(address[] guys, address lift_whom) public returns (bytes32) {
+    function doVote(address[] memory guys, address lift_whom) public returns (bytes32) {
         bytes32 slate = chief.vote(guys);
         chief.lift(lift_whom);
         return slate;
@@ -115,15 +115,15 @@ contract DSChiefTest is DSThing, DSTest {
     uint256 constant electionSize = 3;
 
     // c prefix: candidate
-    address constant c1 = 0x1;
-    address constant c2 = 0x2;
-    address constant c3 = 0x3;
-    address constant c4 = 0x4;
-    address constant c5 = 0x5;
-    address constant c6 = 0x6;
-    address constant c7 = 0x7;
-    address constant c8 = 0x8;
-    address constant c9 = 0x9;
+    address constant c1 = address(0x1);
+    address constant c2 = address(0x2);
+    address constant c3 = address(0x3);
+    address constant c4 = address(0x4);
+    address constant c5 = address(0x5);
+    address constant c6 = address(0x6);
+    address constant c7 = address(0x7);
+    address constant c8 = address(0x8);
+    address constant c9 = address(0x9);
     uint256 constant initialBalance = 1000 ether;
     uint256 constant uLargeInitialBalance = initialBalance / 3;
     uint256 constant uMediumInitialBalance = initialBalance / 4;
@@ -154,9 +154,9 @@ contract DSChiefTest is DSThing, DSTest {
                uSmallInitialBalance);
         assert(uLargeInitialBalance < uMediumInitialBalance + uSmallInitialBalance);
 
-        gov.transfer(uLarge, uLargeInitialBalance);
-        gov.transfer(uMedium, uMediumInitialBalance);
-        gov.transfer(uSmall, uSmallInitialBalance);
+        gov.transfer(address(uLarge), uLargeInitialBalance);
+        gov.transfer(address(uMedium), uMediumInitialBalance);
+        gov.transfer(address(uSmall), uSmallInitialBalance);
     }
 
     function test_basic_sanity() public pure {
@@ -200,20 +200,19 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_lock_debits_user() public {
-        assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
+        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         uint lockedAmt = uLargeInitialBalance / 10;
-        uLarge.doApprove(gov, chief, lockedAmt);
+        uLarge.doApprove(gov, address(chief), lockedAmt);
         uLarge.doLock(lockedAmt);
 
-        assert(gov.balanceOf(uLarge) == uLargeInitialBalance -
-               lockedAmt);
+        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance - lockedAmt);
     }
 
     function test_changing_weight_after_voting() public {
         uint uLargeLockedAmt = uLargeInitialBalance / 2;
-        uLarge.doApprove(iou, chief, uLargeLockedAmt);
-        uLarge.doApprove(gov, chief, uLargeLockedAmt);
+        uLarge.doApprove(iou, address(chief), uLargeLockedAmt);
+        uLarge.doApprove(gov, address(chief), uLargeLockedAmt);
         uLarge.doLock(uLargeLockedAmt);
 
         address[] memory uLargeSlate = new address[](1);
@@ -227,20 +226,20 @@ contract DSChiefTest is DSThing, DSTest {
         assert(chief.approvals(c1) == 0);
 
         uLargeLockedAmt = uLargeInitialBalance / 4;
-        uLarge.doApprove(gov, chief, uLargeLockedAmt);
+        uLarge.doApprove(gov, address(chief), uLargeLockedAmt);
         uLarge.doLock(uLargeLockedAmt);
 
         assert(chief.approvals(c1) == uLargeLockedAmt);
     }
 
     function test_voting_and_reordering() public {
-        assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
+        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         initial_vote();
 
         // Upset the order.
         uint uLargeLockedAmt = uLargeInitialBalance;
-        uLarge.doApprove(gov, chief, uLargeLockedAmt);
+        uLarge.doApprove(gov, address(chief), uLargeLockedAmt);
         uLarge.doLock(uLargeLockedAmt);
 
         address[] memory uLargeSlate = new address[](1);
@@ -252,7 +251,7 @@ contract DSChiefTest is DSThing, DSTest {
         initial_vote();
 
         // Upset the order.
-        uSmall.doApprove(gov, chief, uSmallInitialBalance);
+        uSmall.doApprove(gov, address(chief), uSmallInitialBalance);
         uSmall.doLock(uSmallInitialBalance);
 
         address[] memory uSmallSlate = new address[](1);
@@ -268,14 +267,14 @@ contract DSChiefTest is DSThing, DSTest {
         initial_vote();
 
         // Upset the order.
-        uSmall.doApprove(gov, chief, uSmallInitialBalance);
+        uSmall.doApprove(gov, address(chief), uSmallInitialBalance);
         uSmall.doLock(uSmallInitialBalance);
 
         address[] memory uSmallSlate = new address[](1);
         uSmallSlate[0] = c3;
         uSmall.doVote(uSmallSlate);
 
-        uMedium.doApprove(iou, chief, uMediumInitialBalance);
+        uMedium.doApprove(iou, address(chief), uMediumInitialBalance);
         uMedium.doFree(uMediumInitialBalance);
 
         chief.lift(c3);
@@ -286,7 +285,7 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function testFail_voting_and_reordering_without_weight() public {
-        assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
+        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         initial_vote();
 
@@ -300,12 +299,12 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_voting_by_slate_id() public {
-        assert(gov.balanceOf(uLarge) == uLargeInitialBalance);
+        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         bytes32 slateID = initial_vote();
 
         // Upset the order.
-        uLarge.doApprove(gov, chief, uLargeInitialBalance);
+        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
         uLarge.doLock(uLargeInitialBalance);
 
         address[] memory uLargeSlate = new address[](1);
@@ -316,7 +315,7 @@ contract DSChiefTest is DSThing, DSTest {
         chief.lift(c4);
 
         // Now restore the old order using a slate ID.
-        uSmall.doApprove(gov, chief, uSmallInitialBalance);
+        uSmall.doApprove(gov, address(chief), uSmallInitialBalance);
         uSmall.doLock(uSmallInitialBalance);
         uSmall.doVote(slateID);
 
@@ -325,77 +324,77 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function testFail_non_hat_can_not_set_roles() public {
-        uSmall.doSetUserRole(uMedium, 1, true);
+        uSmall.doSetUserRole(address(uMedium), 1, true);
     }
 
     function test_hat_can_set_roles() public {
         address[] memory slate = new address[](1);
-        slate[0] = uSmall;
+        slate[0] = address(uSmall);
 
         // Upset the order.
-        uLarge.doApprove(gov, chief, uLargeInitialBalance);
+        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
         uLarge.doLock(uLargeInitialBalance);
 
         uLarge.doVote(slate);
 
         // Update the elected set to reflect the new order.
-        chief.lift(uSmall);
+        chief.lift(address(uSmall));
 
-        uSmall.doSetUserRole(uMedium, 1, true);
+        uSmall.doSetUserRole(address(uMedium), 1, true);
     }
 
     function testFail_non_hat_can_not_role_capability() public {
-        uSmall.doSetRoleCapability(1, uMedium, S("authedFn"), true);
+        uSmall.doSetRoleCapability(1, address(uMedium), S("authedFn"), true);
     }
 
     function test_hat_can_set_role_capability() public {
         address[] memory slate = new address[](1);
-        slate[0] = uSmall;
+        slate[0] = address(uSmall);
 
         // Upset the order.
-        uLarge.doApprove(gov, chief, uLargeInitialBalance);
+        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
         uLarge.doLock(uLargeInitialBalance);
 
         uLarge.doVote(slate);
 
         // Update the elected set to reflect the new order.
-        chief.lift(uSmall);
+        chief.lift(address(uSmall));
 
-        uSmall.doSetRoleCapability(1, uLarge, S("authedFn()"), true);
-        uSmall.doSetUserRole(this, 1, true);
+        uSmall.doSetRoleCapability(1, address(uLarge), S("authedFn()"), true);
+        uSmall.doSetUserRole(address(this), 1, true);
 
         uLarge.setAuthority(chief);
-        uLarge.setOwner(0);
+        uLarge.setOwner(address(0));
         uLarge.authedFn();
     }
 
     function test_hat_can_set_public_capability() public {
         address[] memory slate = new address[](1);
-        slate[0] = uSmall;
+        slate[0] = address(uSmall);
 
         // Upset the order.
-        uLarge.doApprove(gov, chief, uLargeInitialBalance);
+        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
         uLarge.doLock(uLargeInitialBalance);
 
         uLarge.doVote(slate);
 
         // Update the elected set to reflect the new order.
-        chief.lift(uSmall);
+        chief.lift(address(uSmall));
 
-        uSmall.doSetPublicCapability(uLarge, S("authedFn()"), true);
+        uSmall.doSetPublicCapability(address(uLarge), S("authedFn()"), true);
 
         uLarge.setAuthority(chief);
-        uLarge.setOwner(0);
+        uLarge.setOwner(address(0));
         uLarge.authedFn();
     }
 
     function test_chief_no_owner() public {
-        assertEq(chief.owner(), 0);
+        assertEq(chief.owner(), address(0));
     }
 
     function initial_vote() internal returns (bytes32 slateID) {
         uint uMediumLockedAmt = uMediumInitialBalance;
-        uMedium.doApprove(gov, chief, uMediumLockedAmt);
+        uMedium.doApprove(gov, address(chief), uMediumLockedAmt);
         uMedium.doLock(uMediumLockedAmt);
 
         address[] memory uMediumSlate = new address[](3);

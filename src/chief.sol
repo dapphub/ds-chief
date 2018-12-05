@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity ^0.4.23;
+pragma solidity >=0.4.23;
 
 import 'ds-token/token.sol';
 import 'ds-roles/roles.sol';
@@ -66,7 +66,7 @@ contract DSChiefApprovals is DSThing {
         GOV.push(msg.sender, wad);
     }
 
-    function etch(address[] yays)
+    function etch(address[] memory yays)
         public
         note
         returns (bytes32 slate)
@@ -80,7 +80,7 @@ contract DSChiefApprovals is DSThing {
         return hash;
     }
 
-    function vote(address[] yays) public returns (bytes32)
+    function vote(address[] memory yays) public returns (bytes32)
         // note  both sub-calls note
     {
         bytes32 slate = etch(yays);
@@ -126,7 +126,7 @@ contract DSChiefApprovals is DSThing {
     }
 
     // Throws unless the array of addresses is a ordered set.
-    function requireByteOrderedSet(address[] yays)
+    function requireByteOrderedSet(address[] memory yays)
         internal
         pure
     {
@@ -135,7 +135,7 @@ contract DSChiefApprovals is DSThing {
         }
         for( uint i = 0; i < yays.length - 1; i++ ) {
             // strict inequality ensures both ordering and uniqueness
-            require(uint(bytes32(yays[i])) < uint256(bytes32(yays[i+1])));
+            require(uint(yays[i]) < uint(yays[i+1]));
         }
     }
 }
@@ -150,7 +150,7 @@ contract DSChief is DSRoles, DSChiefApprovals {
         public
     {
         authority = this;
-        owner = 0;
+        owner = address(0);
     }
 
     function setOwner(address owner_) public {
@@ -164,8 +164,7 @@ contract DSChief is DSRoles, DSChiefApprovals {
     }
 
     function isUserRoot(address who)
-        public
-        constant
+        public view
         returns (bool)
     {
         return (who == hat);
@@ -180,6 +179,6 @@ contract DSChiefFab {
     function newChief(DSToken gov, uint MAX_YAYS) public returns (DSChief chief) {
         DSToken iou = new DSToken('IOU');
         chief = new DSChief(gov, iou, MAX_YAYS);
-        iou.setOwner(chief);
+        iou.setOwner(address(chief));
     }
 }

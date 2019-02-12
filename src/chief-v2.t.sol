@@ -3,7 +3,7 @@ pragma solidity >=0.5.0;
 import "ds-test/test.sol";
 import "ds-token/token.sol";
 
-import "./Chief.sol";
+import "./chief-v2.sol";
 
 contract Voter {
     DSToken   gov;
@@ -85,7 +85,7 @@ contract ChiefTest is DSTest {
     function test_sanity_setup_check() public {
         assertEq(chief.threshold(), 10 ** 18 / 2);
         assertEq(chief.locked(), 0);
-        assertEq(address(chief.gov()), address(gov));
+        assertEq(address(chief.governanceToken()), address(gov));
         assertEq(chief.balances(address(ben)), 0);
         assertEq(chief.picks(address(ben)), bytes32(0));
 

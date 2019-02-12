@@ -48,7 +48,7 @@ contract Chief is DSNote, DSMath {
     }
     function free(uint256 wad) public note {
         balances[msg.sender] = sub(balances[msg.sender], wad);
-        require(governanceToken.transferFrom( address(this), msg.sender, wad), "ds-chief-transfer-failed");
+        require(governanceToken.transferFrom(address(this), msg.sender, wad), "ds-chief-transfer-failed");
         locked = sub(locked, wad);
 
         bytes32 currPick = picks[msg.sender];
@@ -57,7 +57,7 @@ contract Chief is DSNote, DSMath {
     }
 
     function vote(bytes32 currPick) public {
-        require(!hasFired[currPick], "ds-chief-propposal-has-already-been-enacted");        
+        require(!hasFired[currPick], "ds-chief-proposal-has-already-been-enacted");        
 
         uint256 weight   = balances[msg.sender];
         bytes32 prevPick = picks[msg.sender];
@@ -72,7 +72,7 @@ contract Chief is DSNote, DSMath {
     }
     function exec(address app, bytes memory data) public {
         bytes32 proposal = keccak256(abi.encode(app, data));
-        require(!hasFired[proposal], "ds-chief-propposal-has-already-been-enacted");
+        require(!hasFired[proposal], "ds-chief-proposal-has-already-been-enacted");
         require(votes[proposal] > wmul(locked, threshold), "ds-chief-proposal-does-not-pass-threshold");
 
         assembly {

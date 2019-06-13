@@ -92,6 +92,8 @@ contract DSChiefApprovals is DSThing {
         public
         note
     {
+        require(slates[slate].length > 0 ||
+            slate == 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470, "ds-chief-invalid-slate");
         uint weight = deposits[msg.sender];
         subWeight(weight, votes[msg.sender]);
         votes[msg.sender] = slate;

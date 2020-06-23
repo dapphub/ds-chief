@@ -25,28 +25,28 @@ import 'ds-thing/thing.sol';
 // of `DSAuthority`, like with `ds-roles`.
 //   SEE VoteQuorum
 contract VoteQuorumApprovals is DSThing {
-    mapping(bytes32=>address[]) public slates;
+    mapping(bytes32=>address[]) public ballots;
     mapping(address=>bytes32) public votes;
     mapping(address=>uint256) public approvals;
     mapping(address=>uint256) public deposits;
     DSToken public GOV; // voting token that gets locked up
     DSToken public IOU; // non-voting representation of a token, for e.g. secondary voting mechanisms
-    address public hat; // the voteQuorumtain's hat
+    address public votedAuthority; // the quorum's chosen authority
 
-    uint256 public MAX_YAYS;
+    uint256 public MAX_CANDIDATES_PER_BALLOT;
 
-    event Etch(bytes32 indexed slate);
+    event GroupCandidates(bytes32 indexed ballot);
 
     // IOU constructed outside this contract reduces deployment costs significantly
-    // lock/free/vote are quite sensitive to token invariants. Caution is advised.
-    constructor(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_) public
+    // addVotingWeight/removeVotingWeight/vote are quite sensitive to token invariants. Caution is advised.
+    constructor(DSToken GOV_, DSToken IOU_, uint MAX_CANDIDATES_PER_BALLOT_) public
     {
         GOV = GOV_;
         IOU = IOU_;
-        MAX_YAYS = MAX_YAYS_;
+        MAX_CANDIDATES_PER_BALLOT = MAX_CANDIDATES_PER_BALLOT_;
     }
 
-    function lock(uint wad)
+    function addVotingWeight(uint wad)
         public
         note
     {
@@ -56,7 +56,7 @@ contract VoteQuorumApprovals is DSThing {
         addWeight(wad, votes[msg.sender]);
     }
 
-    function free(uint wad)
+    function removeVotingWeight(uint wad)
         public
         note
     {
@@ -66,89 +66,88 @@ contract VoteQuorumApprovals is DSThing {
         GOV.push(msg.sender, wad);
     }
 
-    function etch(address[] memory yays)
+    function groupCandidates(address[] memory candidates)
         public
         note
-        returns (bytes32 slate)
+        returns (bytes32 ballot)
     {
-        require( yays.length <= MAX_YAYS );
-        requireByteOrderedSet(yays);
+        require( candidates.length <= MAX_CANDIDATES_PER_BALLOT );
+        requireByteOrderedSet(candidates);
 
-        bytes32 hash = keccak256(abi.encodePacked(yays));
-        slates[hash] = yays;
-        emit Etch(hash);
-        return hash;
+        bytes32 _hash = keccak256(abi.encodePacked(candidates));
+        ballots[_hash] = candidates;
+        emit GroupCandidates(_hash);
+        return _hash;
     }
 
-    function vote(address[] memory yays) public returns (bytes32)
+    function vote(address[] memory candidates) public returns (bytes32)
         // note  both sub-calls note
     {
-        bytes32 slate = etch(yays);
-        vote(slate);
-        return slate;
+        bytes32 ballot = groupCandidates(candidates);
+        vote(ballot);
+        return ballot;
     }
 
-    function vote(bytes32 slate)
+    function vote(bytes32 ballot)
         public
         note
     {
-        require(slates[slate].length > 0 ||
-            slate == 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470, "ds-voteQuorum-invalid-slate");
+        require(ballots[ballot].length > 0 ||
+            ballot == 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470, "ds-vote-quorum-invalid-ballot");
         uint weight = deposits[msg.sender];
         subWeight(weight, votes[msg.sender]);
-        votes[msg.sender] = slate;
+        votes[msg.sender] = ballot;
         addWeight(weight, votes[msg.sender]);
     }
 
-    // like `drop`/`swap` except simply "elect this address if it is higher than current hat"
-    function lift(address whom)
+    function electCandidate(address whom)
         public
         note
     {
-        require(approvals[whom] > approvals[hat]);
-        hat = whom;
+        require(approvals[whom] > approvals[votedAuthority]);
+        votedAuthority = whom;
     }
 
-    function addWeight(uint weight, bytes32 slate)
+    function addWeight(uint weight, bytes32 ballot)
         internal
     {
-        address[] storage yays = slates[slate];
-        for( uint i = 0; i < yays.length; i++) {
-            approvals[yays[i]] = add(approvals[yays[i]], weight);
+        address[] storage candidates = ballots[ballot];
+        for( uint i = 0; i < candidates.length; i++) {
+            approvals[candidates[i]] = add(approvals[candidates[i]], weight);
         }
     }
 
-    function subWeight(uint weight, bytes32 slate)
+    function subWeight(uint weight, bytes32 ballot)
         internal
     {
-        address[] storage yays = slates[slate];
-        for( uint i = 0; i < yays.length; i++) {
-            approvals[yays[i]] = sub(approvals[yays[i]], weight);
+        address[] storage candidates = ballots[ballot];
+        for( uint i = 0; i < candidates.length; i++) {
+            approvals[candidates[i]] = sub(approvals[candidates[i]], weight);
         }
     }
 
     // Throws unless the array of addresses is a ordered set.
-    function requireByteOrderedSet(address[] memory yays)
+    function requireByteOrderedSet(address[] memory candidates)
         internal
         pure
     {
-        if( yays.length == 0 || yays.length == 1 ) {
+        if( candidates.length == 0 || candidates.length == 1 ) {
             return;
         }
-        for( uint i = 0; i < yays.length - 1; i++ ) {
+        for( uint i = 0; i < candidates.length - 1; i++ ) {
             // strict inequality ensures both ordering and uniqueness
-            require(uint(yays[i]) < uint(yays[i+1]));
+            require(uint(candidates[i]) < uint(candidates[i+1]));
         }
     }
 }
 
 
-// `hat` address is unique root user (has every role) and the
+// `votedAuthority` address is unique root user (has every role) and the
 // unique owner of role 0 (typically 'sys' or 'internal')
 contract VoteQuorum is DSRoles, VoteQuorumApprovals {
 
-    constructor(DSToken GOV, DSToken IOU, uint MAX_YAYS)
-             VoteQuorumApprovals (GOV, IOU, MAX_YAYS)
+    constructor(DSToken GOV, DSToken IOU, uint MAX_CANDIDATES_PER_BALLOT)
+             VoteQuorumApprovals (GOV, IOU, MAX_CANDIDATES_PER_BALLOT)
         public
     {
         authority = this;
@@ -171,7 +170,7 @@ contract VoteQuorum is DSRoles, VoteQuorumApprovals {
         view
         returns (bool)
     {
-        return (who == hat);
+        return (who == votedAuthority);
     }
     function setRootUser(address who, bool enabled) override public {
         who; enabled;
@@ -180,9 +179,9 @@ contract VoteQuorum is DSRoles, VoteQuorumApprovals {
 }
 
 contract VoteQuorumFactory {
-    function newVoteQuorum(DSToken gov, uint MAX_YAYS) public returns (VoteQuorum voteQuorum) {
+    function newVoteQuorum(DSToken gov, uint MAX_CANDIDATES_PER_BALLOT) public returns (VoteQuorum voteQuorum) {
         DSToken iou = new DSToken('IOU');
-        voteQuorum = new VoteQuorum(gov, iou, MAX_YAYS);
+        voteQuorum = new VoteQuorum(gov, iou, MAX_CANDIDATES_PER_BALLOT);
         iou.setOwner(address(voteQuorum));
     }
 }

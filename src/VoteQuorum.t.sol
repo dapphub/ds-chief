@@ -59,39 +59,39 @@ contract VoteQuorumUser is DSThing {
         return token.allowance(owner, spender);
     }
 
-    function doEtch(address[] memory guys) public returns (bytes32) {
-        return voteQuorum.etch(guys);
+    function doGroupCandidates(address[] memory guys) public returns (bytes32) {
+        return voteQuorum.groupCandidates(guys);
     }
 
     function doVote(address[] memory guys) public returns (bytes32) {
         return voteQuorum.vote(guys);
     }
 
-    function doVote(address[] memory guys, address lift_whom) public returns (bytes32) {
-        bytes32 slate = voteQuorum.vote(guys);
-        voteQuorum.lift(lift_whom);
-        return slate;
+    function doVote(address[] memory guys, address elect_whom) public returns (bytes32) {
+        bytes32 ballot = voteQuorum.vote(guys);
+        voteQuorum.electCandidate(elect_whom);
+        return ballot;
     }
 
     function doVote(bytes32 id) public {
         voteQuorum.vote(id);
     }
 
-    function doVote(bytes32 id, address lift_whom) public {
+    function doVote(bytes32 id, address elect_whom) public {
         voteQuorum.vote(id);
-        voteQuorum.lift(lift_whom);
+        voteQuorum.electCandidate(elect_whom);
     }
 
-    function doLift(address to_lift) public {
-        voteQuorum.lift(to_lift);
+    function doLift(address to_elect) public {
+        voteQuorum.electCandidate(to_elect);
     }
 
-    function doLock(uint amt) public {
-        voteQuorum.lock(amt);
+    function doAddVotingWeight(uint amt) public {
+        voteQuorum.addVotingWeight(amt);
     }
 
-    function doFree(uint amt) public {
-        voteQuorum.free(amt);
+    function doRemoveVotingWeight(uint amt) public {
+        voteQuorum.removeVotingWeight(amt);
     }
 
     function doSetUserRole(address who, uint8 role, bool enabled) public {
@@ -167,44 +167,44 @@ contract VoteQuorumTest is DSThing, DSTest {
         assert(false);
     }
 
-    function test_etch_returns_same_id_for_same_sets() public {
+    function test_group_candidates_returns_same_id_for_same_sets() public {
         address[] memory candidates = new address[](3);
         candidates[0] = c1;
         candidates[1] = c2;
         candidates[2] = c3;
 
-        bytes32 id = uSmall.doEtch(candidates);
+        bytes32 id = uSmall.doGroupCandidates(candidates);
         assert(id != 0x0);
-        assertEq32(id, uMedium.doEtch(candidates));
+        assertEq32(id, uMedium.doGroupCandidates(candidates));
     }
 
-    function test_size_zero_slate() public {
+    function test_size_zero_ballot() public {
         address[] memory candidates = new address[](0);
-        bytes32 id = uSmall.doEtch(candidates);
+        bytes32 id = uSmall.doGroupCandidates(candidates);
         uSmall.doVote(id);
     }
-    function test_size_one_slate() public {
+    function test_size_one_ballot() public {
         address[] memory candidates = new address[](1);
         candidates[0] = c1;
-        bytes32 id = uSmall.doEtch(candidates);
+        bytes32 id = uSmall.doGroupCandidates(candidates);
         uSmall.doVote(id);
     }
 
-    function testFail_etch_requires_ordered_sets() public {
+    function testFail_group_candidates_requires_ordered_sets() public {
         address[] memory candidates = new address[](3);
         candidates[0] = c2;
         candidates[1] = c1;
         candidates[2] = c3;
 
-        uSmall.doEtch(candidates);
+        uSmall.doGroupCandidates(candidates);
     }
 
-    function test_lock_debits_user() public {
+    function test_add_weight_debits_user() public {
         assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         uint lockedAmt = uLargeInitialBalance / 10;
         uLarge.doApprove(gov, address(voteQuorum), lockedAmt);
-        uLarge.doLock(lockedAmt);
+        uLarge.doAddVotingWeight(lockedAmt);
 
         assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance - lockedAmt);
     }
@@ -213,7 +213,7 @@ contract VoteQuorumTest is DSThing, DSTest {
         uint uLargeLockedAmt = uLargeInitialBalance / 2;
         uLarge.doApprove(iou, address(voteQuorum), uLargeLockedAmt);
         uLarge.doApprove(gov, address(voteQuorum), uLargeLockedAmt);
-        uLarge.doLock(uLargeLockedAmt);
+        uLarge.doAddVotingWeight(uLargeLockedAmt);
 
         address[] memory uLargeSlate = new address[](1);
         uLargeSlate[0] = c1;
@@ -222,12 +222,12 @@ contract VoteQuorumTest is DSThing, DSTest {
         assert(voteQuorum.approvals(c1) == uLargeLockedAmt);
 
         // Changing weight should update the weight of our candidate.
-        uLarge.doFree(uLargeLockedAmt);
+        uLarge.doRemoveVotingWeight(uLargeLockedAmt);
         assert(voteQuorum.approvals(c1) == 0);
 
         uLargeLockedAmt = uLargeInitialBalance / 4;
         uLarge.doApprove(gov, address(voteQuorum), uLargeLockedAmt);
-        uLarge.doLock(uLargeLockedAmt);
+        uLarge.doAddVotingWeight(uLargeLockedAmt);
 
         assert(voteQuorum.approvals(c1) == uLargeLockedAmt);
     }
@@ -240,44 +240,44 @@ contract VoteQuorumTest is DSThing, DSTest {
         // Upset the order.
         uint uLargeLockedAmt = uLargeInitialBalance;
         uLarge.doApprove(gov, address(voteQuorum), uLargeLockedAmt);
-        uLarge.doLock(uLargeLockedAmt);
+        uLarge.doAddVotingWeight(uLargeLockedAmt);
 
         address[] memory uLargeSlate = new address[](1);
         uLargeSlate[0] = c3;
         uLarge.doVote(uLargeSlate);
     }
 
-    function testFail_lift_while_out_of_order() public {
+    function testFail_elect_while_out_of_order() public {
         initial_vote();
 
         // Upset the order.
         uSmall.doApprove(gov, address(voteQuorum), uSmallInitialBalance);
-        uSmall.doLock(uSmallInitialBalance);
+        uSmall.doAddVotingWeight(uSmallInitialBalance);
 
         address[] memory uSmallSlate = new address[](1);
         uSmallSlate[0] = c3;
         uSmall.doVote(uSmallSlate);
 
-        uMedium.doFree(uMediumInitialBalance);
+        uMedium.doRemoveVotingWeight(uMediumInitialBalance);
 
-        voteQuorum.lift(c3);
+        voteQuorum.electCandidate(c3);
     }
 
-    function test_lift_half_approvals() public {
+    function test_elect_half_approvals() public {
         initial_vote();
 
         // Upset the order.
         uSmall.doApprove(gov, address(voteQuorum), uSmallInitialBalance);
-        uSmall.doLock(uSmallInitialBalance);
+        uSmall.doAddVotingWeight(uSmallInitialBalance);
 
         address[] memory uSmallSlate = new address[](1);
         uSmallSlate[0] = c3;
         uSmall.doVote(uSmallSlate);
 
         uMedium.doApprove(iou, address(voteQuorum), uMediumInitialBalance);
-        uMedium.doFree(uMediumInitialBalance);
+        uMedium.doRemoveVotingWeight(uMediumInitialBalance);
 
-        voteQuorum.lift(c3);
+        voteQuorum.electCandidate(c3);
 
         assert(!voteQuorum.isUserRoot(c1));
         assert(!voteQuorum.isUserRoot(c2));
@@ -295,70 +295,70 @@ contract VoteQuorumTest is DSThing, DSTest {
         uLarge.doVote(uLargeSlate);
 
         // Attempt to update the elected set.
-        voteQuorum.lift(c3);
+        voteQuorum.electCandidate(c3);
     }
 
-    function test_voting_by_slate_id() public {
+    function test_voting_by_ballot_id() public {
         assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
-        bytes32 slateID = initial_vote();
+        bytes32 ballotID = initial_vote();
 
         // Upset the order.
         uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
-        uLarge.doLock(uLargeInitialBalance);
+        uLarge.doAddVotingWeight(uLargeInitialBalance);
 
         address[] memory uLargeSlate = new address[](1);
         uLargeSlate[0] = c4;
         uLarge.doVote(uLargeSlate);
 
         // Update the elected set to reflect the new order.
-        voteQuorum.lift(c4);
+        voteQuorum.electCandidate(c4);
 
-        // Now restore the old order using a slate ID.
+        // Now restore the old order using a ballot ID.
         uSmall.doApprove(gov, address(voteQuorum), uSmallInitialBalance);
-        uSmall.doLock(uSmallInitialBalance);
-        uSmall.doVote(slateID);
+        uSmall.doAddVotingWeight(uSmallInitialBalance);
+        uSmall.doVote(ballotID);
 
         // Update the elected set to reflect the restored order.
-        voteQuorum.lift(c1);
+        voteQuorum.electCandidate(c1);
     }
 
-    function testFail_non_hat_can_not_set_roles() public {
+    function testFail_non_voted_authority_can_not_set_roles() public {
         uSmall.doSetUserRole(address(uMedium), 1, true);
     }
 
-    function test_hat_can_set_roles() public {
-        address[] memory slate = new address[](1);
-        slate[0] = address(uSmall);
+    function test_voted_authority_can_set_roles() public {
+        address[] memory ballot = new address[](1);
+        ballot[0] = address(uSmall);
 
         // Upset the order.
         uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
-        uLarge.doLock(uLargeInitialBalance);
+        uLarge.doAddVotingWeight(uLargeInitialBalance);
 
-        uLarge.doVote(slate);
+        uLarge.doVote(ballot);
 
         // Update the elected set to reflect the new order.
-        voteQuorum.lift(address(uSmall));
+        voteQuorum.electCandidate(address(uSmall));
 
         uSmall.doSetUserRole(address(uMedium), 1, true);
     }
 
-    function testFail_non_hat_can_not_role_capability() public {
+    function testFail_non_voted_authority_can_not_role_capability() public {
         uSmall.doSetRoleCapability(1, address(uMedium), S("authedFn"), true);
     }
 
-    function test_hat_can_set_role_capability() public {
-        address[] memory slate = new address[](1);
-        slate[0] = address(uSmall);
+    function test_voted_authority_can_set_role_capability() public {
+        address[] memory ballot = new address[](1);
+        ballot[0] = address(uSmall);
 
         // Upset the order.
         uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
-        uLarge.doLock(uLargeInitialBalance);
+        uLarge.doAddVotingWeight(uLargeInitialBalance);
 
-        uLarge.doVote(slate);
+        uLarge.doVote(ballot);
 
         // Update the elected set to reflect the new order.
-        voteQuorum.lift(address(uSmall));
+        voteQuorum.electCandidate(address(uSmall));
 
         uSmall.doSetRoleCapability(1, address(uLarge), S("authedFn()"), true);
         uSmall.doSetUserRole(address(this), 1, true);
@@ -368,18 +368,18 @@ contract VoteQuorumTest is DSThing, DSTest {
         uLarge.authedFn();
     }
 
-    function test_hat_can_set_public_capability() public {
-        address[] memory slate = new address[](1);
-        slate[0] = address(uSmall);
+    function test_voted_authority_can_set_public_capability() public {
+        address[] memory ballot = new address[](1);
+        ballot[0] = address(uSmall);
 
         // Upset the order.
         uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
-        uLarge.doLock(uLargeInitialBalance);
+        uLarge.doAddVotingWeight(uLargeInitialBalance);
 
-        uLarge.doVote(slate);
+        uLarge.doVote(ballot);
 
         // Update the elected set to reflect the new order.
-        voteQuorum.lift(address(uSmall));
+        voteQuorum.electCandidate(address(uSmall));
 
         uSmall.doSetPublicCapability(address(uLarge), S("authedFn()"), true);
 
@@ -388,22 +388,22 @@ contract VoteQuorumTest is DSThing, DSTest {
         uLarge.authedFn();
     }
 
-    function test_voteQuorum_no_owner() public {
+    function test_vote_quorum_no_owner() public {
         assertEq(voteQuorum.owner(), address(0));
     }
 
-    function initial_vote() internal returns (bytes32 slateID) {
+    function initial_vote() internal returns (bytes32 ballotID) {
         uint uMediumLockedAmt = uMediumInitialBalance;
         uMedium.doApprove(gov, address(voteQuorum), uMediumLockedAmt);
-        uMedium.doLock(uMediumLockedAmt);
+        uMedium.doAddVotingWeight(uMediumLockedAmt);
 
         address[] memory uMediumSlate = new address[](3);
         uMediumSlate[0] = c1;
         uMediumSlate[1] = c2;
         uMediumSlate[2] = c3;
-        slateID = uMedium.doVote(uMediumSlate);
+        ballotID = uMedium.doVote(uMediumSlate);
 
-        // Lift the voteQuorum.
-        voteQuorum.lift(c1);
+        // Elect the most voted candidate.
+        voteQuorum.electCandidate(c1);
     }
 }

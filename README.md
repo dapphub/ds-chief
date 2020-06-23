@@ -15,14 +15,14 @@ has actually locked funds in the contract, and only up to the amount they have l
 ## Note on Quorums
 
 Though anthropocentric language is used throughout this document when referring
-to the "chief," you should keep in mind that addresses can represent contracts
+to the "vote-quorum," you should keep in mind that addresses can represent contracts
 as well as people. Thus, `ds-vote-quorum` works just as well as a method for selecting
 code for execution as it does for realizing political processes. For example,
 `ds-vote-quorum` could conceivably be used as a multisignature contract with
 token-weighted voting governing another set of smart contracts using `ds-auth`
 with `ds-roles`. In this scenario, "candidates" would consist of contracts
 mutating the state of the smart contract set under governance. Such a contract
-being elected "chief" would be granted all permissions to execute whatever
+being elected "vote-quorum" would be granted all permissions to execute whatever
 changes necessary. `ds-vote-quorum` could also be used within such a contract
 set in conjunction with a proxy contract like `ds-proxy` or a name resolution
 system like ENS for the purpose of voting in new versions of contracts.
@@ -34,8 +34,8 @@ The IOU token allows for chaining governance contracts. An arbitrary number of
 `VoteQuorum`, `DSPrism`, or other contracts of that kind may essentially use the
 same governance token by accepting the IOU token of the `VoteQuorum` contract
 before it as a governance token. E.g., given three `VoteQuorum` contracts,
-`chiefA`, `chiefB`, and `chiefC`, with `chiefA.GOV` being the protocol token,
-setting `chiefB.GOV` to `chiefA.IOU` and `chiefC.GOV` to `chiefB.IOU` allows all
+`voteQuorumA`, `voteQuorumB`, and `voteQuorumC`, with `voteQuorumA.GOV` being the protocol token,
+setting `voteQuorumB.GOV` to `voteQuorumA.IOU` and `voteQuorumC.GOV` to `voteQuorumB.IOU` allows all
 three contracts to essentially run using a common pool of tokens.
 
 
@@ -62,7 +62,7 @@ must be specified at the time of deployment and cannot be changed afterward.
 ## Notice for Client Implementations
 
 If you are writing a frontend for this smart contract, please note that the
-`address[]` parameters passed to the `etch` and `vote` functions must be
+`address[]` parameters passed to the `groupCandidates` and `vote` functions must be
 _byte-ordered sets_. E.g., `[0x0, 0x1, 0x2, ...]` is valid, `[0x1, 0x0, ...]`
 and `[0x0, 0x0, 0x1, ...]` are not. This ordering constraint allows the contract
 to cheaply ensure voters cannot multiply their weights by listing the same
@@ -88,7 +88,7 @@ inherits from `VoteQuorumApprovals`.
 
 Most of the functions are decorated with the the `note` modifier from [ds-note](https://dapp.tools/dappsys/ds-note.html), meaning that they fire a standardized event when called. Additionally, one custom event is also provided:
 
-- `Etch(bytes32 indexed ballot)`: Fired when a ballot is created.
+- `GroupCandidates(bytes32 indexed ballot)`: Fired when a ballot is created.
 
 Its public functions are as follows:
 
@@ -111,12 +111,12 @@ the user, and subtracts `wad` weight from the candidates on the user's selected
 ballot. Fires a `LogLockFree` event.
 
 
-### `etch(address[] yays) returns (bytes32 ballot)`
+### `groupCandidates(address[] candidates) returns (bytes32 ballot)`
 
 Save a set of ordered addresses and return a unique identifier for it.
 
 
-### `vote(address[] yays) returns (bytes32 ballot)`
+### `vote(address[] candidates) returns (bytes32 ballot)`
 
 Save a set of ordered addresses as a ballot, moves the voter's weight from their
 current ballot to the new ballot, and returns the ballot's identifier.
@@ -128,10 +128,10 @@ Removes voter's weight from their current ballot and adds it to the specified
 ballot.
 
 
-### `lift(address whom)`
+### `electCandidate(address whom)`
 
-Checks the given address and promotes it to `chief` if it has more weight than
-the current chief.
+Checks the given address and promotes it to `vote-quorum` if it has more weight than
+the current vote-quorum.
 
 
 `VoteQuorum` is a combination of `DSRoles` from the `ds-roles` package and
@@ -156,7 +156,7 @@ Reverts the transaction. Overridden from `DSAuth`.
 
 ### `isUserRoot(address who) constant returns (bool)`
 
-Returns `true` if the given address is the chief.
+Returns `true` if the given address is the vote-quorum.
 
 
 ### `setRootUser(address who, bool enabled)`

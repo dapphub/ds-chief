@@ -1,9 +1,8 @@
-# ds-chief
-
+# ds-vote-quorum
 
 ## Summary
 
-This contract provides a way to elect a "chief" contract via approval voting.
+This contract provides a way to elect a lead contract via approval voting.
 This may be combined with another contract, such as `DSAuthority`, to elect a
 ruleset for a smart contract system.
 
@@ -13,7 +12,7 @@ tokens any time they lock voting tokens, which is useful for secondary governanc
 The IOU tokens may not be exchanged for the locked tokens except by someone who
 has actually locked funds in the contract, and only up to the amount they have locked.
 
-## Note on Chiefs
+## Note on Quorums
 
 Though anthropocentric language is used throughout this document when referring
 to the "chief," you should keep in mind that addresses can represent contracts
@@ -32,9 +31,9 @@ system like ENS for the purpose of voting in new versions of contracts.
 ## Why an IOU Token?
 
 The IOU token allows for chaining governance contracts. An arbitrary number of
-`DSChief`, `DSPrism`, or other contracts of that kind may essentially use the
-same governance token by accepting the IOU token of the `DSChief` contract
-before it as a governance token. E.g., given three `DSChief` contracts,
+`VoteQuorum`, `DSPrism`, or other contracts of that kind may essentially use the
+same governance token by accepting the IOU token of the `VoteQuorum` contract
+before it as a governance token. E.g., given three `VoteQuorum` contracts,
 `chiefA`, `chiefB`, and `chiefC`, with `chiefA.GOV` being the `MKR` token,
 setting `chiefB.GOV` to `chiefA.IOU` and `chiefC.GOV` to `chiefB.IOU` allows all
 three contracts to essentially run using a common pool of `MKR`.
@@ -53,7 +52,7 @@ momentarily into the set of elected candidates.
 In the case of `ds-chief`, `n` is 1.
 
 In addition, `ds-chief` weights votes according to the quantity of a voting
-token they've chosen to lock up in the `DSChief` or `DSChiefApprovals` contract.
+token they've chosen to lock up in the `VoteQuorum` or `VoteQuorumApprovals` contract.
 
 It's important to note that the voting token used in a `ds-chief` deployment
 must be specified at the time of deployment and cannot be changed afterward.
@@ -72,10 +71,10 @@ candidate on their slate multiple times.
 
 ## APIs
 
-There are two contracts in `ds-chief`: `DSChiefApprovals` and `DSChief`, which
-inherits from `DSChiefApprovals`.
+There are two contracts in `ds-chief`: `VoteQuorumApprovals` and `VoteQuorum`, which
+inherits from `VoteQuorumApprovals`.
 
-`DSChiefApprovals` provides the following public properties:
+`VoteQuorumApprovals` provides the following public properties:
 
 - `slates`: A mapping of `bytes32` to `address` arrays. Represents sets of
   candidates. Weighted votes are given to slates.
@@ -93,7 +92,7 @@ Most of the functions are decorated with the the `note` modifier from [ds-note](
 
 Its public functions are as follows:
 
-### `DSChiefApprovals(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_)`
+### `VoteQuorumApprovals(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_)`
 
 The constructor.  Sets `GOV`, `IOU`, and `MAX_YAYS`.
 
@@ -135,14 +134,14 @@ Checks the given address and promotes it to `chief` if it has more weight than
 the current chief.
 
 
-`DSChief` is a combination of `DSRoles` from the `ds-roles` package and
-`DSChiefApprovals`. It can be used in conjunction with `ds-auth` to govern smart
+`VoteQuorum` is a combination of `DSRoles` from the `ds-roles` package and
+`VoteQuorumApprovals`. It can be used in conjunction with `ds-auth` to govern smart
 contract systems.
 
 Its public functions are as follows:
 
 
-### `DSChief(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_)`
+### `VoteQuorum(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_)`
 
 The constructor.  Sets `GOV`, `IOU`, and `MAX_YAYS`.
 

@@ -1,4 +1,4 @@
-// chief.sol - select an authority by consensus
+// VoteQuorum.sol - select an authority by consensus
 
 // Copyright (C) 2017  DappHub, LLC
 
@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity >=0.4.23;
+pragma solidity >=0.6.7;
 
 import 'ds-token/token.sol';
 import 'ds-roles/roles.sol';
@@ -23,15 +23,15 @@ import 'ds-thing/thing.sol';
 
 // The right way to use this contract is probably to mix it with some kind
 // of `DSAuthority`, like with `ds-roles`.
-//   SEE DSChief
-contract DSChiefApprovals is DSThing {
+//   SEE VoteQuorum
+contract VoteQuorumApprovals is DSThing {
     mapping(bytes32=>address[]) public slates;
     mapping(address=>bytes32) public votes;
     mapping(address=>uint256) public approvals;
     mapping(address=>uint256) public deposits;
     DSToken public GOV; // voting token that gets locked up
     DSToken public IOU; // non-voting representation of a token, for e.g. secondary voting mechanisms
-    address public hat; // the chieftain's hat
+    address public hat; // the voteQuorumtain's hat
 
     uint256 public MAX_YAYS;
 
@@ -93,7 +93,7 @@ contract DSChiefApprovals is DSThing {
         note
     {
         require(slates[slate].length > 0 ||
-            slate == 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470, "ds-chief-invalid-slate");
+            slate == 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470, "ds-voteQuorum-invalid-slate");
         uint weight = deposits[msg.sender];
         subWeight(weight, votes[msg.sender]);
         votes[msg.sender] = slate;
@@ -145,42 +145,44 @@ contract DSChiefApprovals is DSThing {
 
 // `hat` address is unique root user (has every role) and the
 // unique owner of role 0 (typically 'sys' or 'internal')
-contract DSChief is DSRoles, DSChiefApprovals {
+contract VoteQuorum is DSRoles, VoteQuorumApprovals {
 
     constructor(DSToken GOV, DSToken IOU, uint MAX_YAYS)
-             DSChiefApprovals (GOV, IOU, MAX_YAYS)
+             VoteQuorumApprovals (GOV, IOU, MAX_YAYS)
         public
     {
         authority = this;
         owner = address(0);
     }
 
-    function setOwner(address owner_) public {
+    function setOwner(address owner_) override public {
         owner_;
         revert();
     }
 
-    function setAuthority(DSAuthority authority_) public {
+    function setAuthority(DSAuthority authority_) override public {
         authority_;
         revert();
     }
 
     function isUserRoot(address who)
-        public view
+        override
+        public
+        view
         returns (bool)
     {
         return (who == hat);
     }
-    function setRootUser(address who, bool enabled) public {
+    function setRootUser(address who, bool enabled) override public {
         who; enabled;
         revert();
     }
 }
 
-contract DSChiefFab {
-    function newChief(DSToken gov, uint MAX_YAYS) public returns (DSChief chief) {
+contract VoteQuorumFactory {
+    function newVoteQuorum(DSToken gov, uint MAX_YAYS) public returns (VoteQuorum voteQuorum) {
         DSToken iou = new DSToken('IOU');
-        chief = new DSChief(gov, iou, MAX_YAYS);
-        iou.setOwner(address(chief));
+        voteQuorum = new VoteQuorum(gov, iou, MAX_YAYS);
+        iou.setOwner(address(voteQuorum));
     }
 }

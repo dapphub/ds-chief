@@ -1,9 +1,0 @@
-html { font: 16pt/1.5 monospace; overflow-y: scroll }
-body { margin: 2rem auto; max-width: 48rem }
-th, td { text-align: right; vertical-align: top }
-[onclick] { cursor: pointer }
-input, textarea { box-sizing: border-box }
-input, textarea, button { font: inherit; width: 100% }
-td, th, input, button, textarea { padding: .5rem 1rem }
-table { border-collapse: collapse }
-.hide { display: none }

@@ -1,4 +1,4 @@
-// chief.t.sol - test for chief.sol
+// VoteQuorum.t.sol - test for VoteQuorum.sol
 
 // Copyright (C) 2017  DappHub, LLC
 
@@ -15,19 +15,19 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity >=0.4.23;
+pragma solidity >=0.6.7;
 
 import "ds-test/test.sol";
 import "ds-token/token.sol";
 import "ds-thing/thing.sol";
 
-import "./chief.sol";
+import "./VoteQuorum.sol";
 
-contract ChiefUser is DSThing {
-    DSChief chief;
+contract VoteQuorumUser is DSThing {
+    VoteQuorum voteQuorum;
 
-    constructor(DSChief chief_) public {
-        chief = chief_;
+    constructor(VoteQuorum voteQuorum_) public {
+        voteQuorum = voteQuorum_;
     }
 
     function doTransferFrom(DSToken token, address from, address to,
@@ -60,50 +60,50 @@ contract ChiefUser is DSThing {
     }
 
     function doEtch(address[] memory guys) public returns (bytes32) {
-        return chief.etch(guys);
+        return voteQuorum.etch(guys);
     }
 
     function doVote(address[] memory guys) public returns (bytes32) {
-        return chief.vote(guys);
+        return voteQuorum.vote(guys);
     }
 
     function doVote(address[] memory guys, address lift_whom) public returns (bytes32) {
-        bytes32 slate = chief.vote(guys);
-        chief.lift(lift_whom);
+        bytes32 slate = voteQuorum.vote(guys);
+        voteQuorum.lift(lift_whom);
         return slate;
     }
 
     function doVote(bytes32 id) public {
-        chief.vote(id);
+        voteQuorum.vote(id);
     }
 
     function doVote(bytes32 id, address lift_whom) public {
-        chief.vote(id);
-        chief.lift(lift_whom);
+        voteQuorum.vote(id);
+        voteQuorum.lift(lift_whom);
     }
 
     function doLift(address to_lift) public {
-        chief.lift(to_lift);
+        voteQuorum.lift(to_lift);
     }
 
     function doLock(uint amt) public {
-        chief.lock(amt);
+        voteQuorum.lock(amt);
     }
 
     function doFree(uint amt) public {
-        chief.free(amt);
+        voteQuorum.free(amt);
     }
 
     function doSetUserRole(address who, uint8 role, bool enabled) public {
-        chief.setUserRole(who, role, enabled);
+        voteQuorum.setUserRole(who, role, enabled);
     }
 
     function doSetRoleCapability(uint8 role, address code, bytes4 sig, bool enabled) public {
-        chief.setRoleCapability(role, code, sig, enabled);
+        voteQuorum.setRoleCapability(role, code, sig, enabled);
     }
 
     function doSetPublicCapability(address code, bytes4 sig, bool enabled) public {
-        chief.setPublicCapability(code, sig, enabled);
+        voteQuorum.setPublicCapability(code, sig, enabled);
     }
 
     function authedFn() public view auth returns (bool) {
@@ -111,7 +111,7 @@ contract ChiefUser is DSThing {
     }
 }
 
-contract DSChiefTest is DSThing, DSTest {
+contract VoteQuorumTest is DSThing, DSTest {
     uint256 constant electionSize = 3;
 
     // c prefix: candidate
@@ -129,26 +129,26 @@ contract DSChiefTest is DSThing, DSTest {
     uint256 constant uMediumInitialBalance = initialBalance / 4;
     uint256 constant uSmallInitialBalance = initialBalance / 5;
 
-    DSChief chief;
+    VoteQuorum voteQuorum;
     DSToken gov;
     DSToken iou;
 
     // u prefix: user
-    ChiefUser uLarge;
-    ChiefUser uMedium;
-    ChiefUser uSmall;
+    VoteQuorumUser uLarge;
+    VoteQuorumUser uMedium;
+    VoteQuorumUser uSmall;
 
     function setUp() public {
         gov = new DSToken("GOV");
         gov.mint(initialBalance);
 
-        DSChiefFab fab = new DSChiefFab();
-        chief = fab.newChief(gov, electionSize);
-        iou = chief.IOU();
+        VoteQuorumFactory fab = new VoteQuorumFactory();
+        voteQuorum = fab.newVoteQuorum(gov, electionSize);
+        iou = voteQuorum.IOU();
 
-        uLarge = new ChiefUser(chief);
-        uMedium = new ChiefUser(chief);
-        uSmall = new ChiefUser(chief);
+        uLarge = new VoteQuorumUser(voteQuorum);
+        uMedium = new VoteQuorumUser(voteQuorum);
+        uSmall = new VoteQuorumUser(voteQuorum);
 
         assert(initialBalance > uLargeInitialBalance + uMediumInitialBalance +
                uSmallInitialBalance);
@@ -203,7 +203,7 @@ contract DSChiefTest is DSThing, DSTest {
         assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         uint lockedAmt = uLargeInitialBalance / 10;
-        uLarge.doApprove(gov, address(chief), lockedAmt);
+        uLarge.doApprove(gov, address(voteQuorum), lockedAmt);
         uLarge.doLock(lockedAmt);
 
         assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance - lockedAmt);
@@ -211,25 +211,25 @@ contract DSChiefTest is DSThing, DSTest {
 
     function test_changing_weight_after_voting() public {
         uint uLargeLockedAmt = uLargeInitialBalance / 2;
-        uLarge.doApprove(iou, address(chief), uLargeLockedAmt);
-        uLarge.doApprove(gov, address(chief), uLargeLockedAmt);
+        uLarge.doApprove(iou, address(voteQuorum), uLargeLockedAmt);
+        uLarge.doApprove(gov, address(voteQuorum), uLargeLockedAmt);
         uLarge.doLock(uLargeLockedAmt);
 
         address[] memory uLargeSlate = new address[](1);
         uLargeSlate[0] = c1;
         uLarge.doVote(uLargeSlate);
 
-        assert(chief.approvals(c1) == uLargeLockedAmt);
+        assert(voteQuorum.approvals(c1) == uLargeLockedAmt);
 
         // Changing weight should update the weight of our candidate.
         uLarge.doFree(uLargeLockedAmt);
-        assert(chief.approvals(c1) == 0);
+        assert(voteQuorum.approvals(c1) == 0);
 
         uLargeLockedAmt = uLargeInitialBalance / 4;
-        uLarge.doApprove(gov, address(chief), uLargeLockedAmt);
+        uLarge.doApprove(gov, address(voteQuorum), uLargeLockedAmt);
         uLarge.doLock(uLargeLockedAmt);
 
-        assert(chief.approvals(c1) == uLargeLockedAmt);
+        assert(voteQuorum.approvals(c1) == uLargeLockedAmt);
     }
 
     function test_voting_and_reordering() public {
@@ -239,7 +239,7 @@ contract DSChiefTest is DSThing, DSTest {
 
         // Upset the order.
         uint uLargeLockedAmt = uLargeInitialBalance;
-        uLarge.doApprove(gov, address(chief), uLargeLockedAmt);
+        uLarge.doApprove(gov, address(voteQuorum), uLargeLockedAmt);
         uLarge.doLock(uLargeLockedAmt);
 
         address[] memory uLargeSlate = new address[](1);
@@ -251,7 +251,7 @@ contract DSChiefTest is DSThing, DSTest {
         initial_vote();
 
         // Upset the order.
-        uSmall.doApprove(gov, address(chief), uSmallInitialBalance);
+        uSmall.doApprove(gov, address(voteQuorum), uSmallInitialBalance);
         uSmall.doLock(uSmallInitialBalance);
 
         address[] memory uSmallSlate = new address[](1);
@@ -260,28 +260,28 @@ contract DSChiefTest is DSThing, DSTest {
 
         uMedium.doFree(uMediumInitialBalance);
 
-        chief.lift(c3);
+        voteQuorum.lift(c3);
     }
 
     function test_lift_half_approvals() public {
         initial_vote();
 
         // Upset the order.
-        uSmall.doApprove(gov, address(chief), uSmallInitialBalance);
+        uSmall.doApprove(gov, address(voteQuorum), uSmallInitialBalance);
         uSmall.doLock(uSmallInitialBalance);
 
         address[] memory uSmallSlate = new address[](1);
         uSmallSlate[0] = c3;
         uSmall.doVote(uSmallSlate);
 
-        uMedium.doApprove(iou, address(chief), uMediumInitialBalance);
+        uMedium.doApprove(iou, address(voteQuorum), uMediumInitialBalance);
         uMedium.doFree(uMediumInitialBalance);
 
-        chief.lift(c3);
+        voteQuorum.lift(c3);
 
-        assert(!chief.isUserRoot(c1));
-        assert(!chief.isUserRoot(c2));
-        assert(chief.isUserRoot(c3));
+        assert(!voteQuorum.isUserRoot(c1));
+        assert(!voteQuorum.isUserRoot(c2));
+        assert(voteQuorum.isUserRoot(c3));
     }
 
     function testFail_voting_and_reordering_without_weight() public {
@@ -295,7 +295,7 @@ contract DSChiefTest is DSThing, DSTest {
         uLarge.doVote(uLargeSlate);
 
         // Attempt to update the elected set.
-        chief.lift(c3);
+        voteQuorum.lift(c3);
     }
 
     function test_voting_by_slate_id() public {
@@ -304,7 +304,7 @@ contract DSChiefTest is DSThing, DSTest {
         bytes32 slateID = initial_vote();
 
         // Upset the order.
-        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
+        uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
         uLarge.doLock(uLargeInitialBalance);
 
         address[] memory uLargeSlate = new address[](1);
@@ -312,15 +312,15 @@ contract DSChiefTest is DSThing, DSTest {
         uLarge.doVote(uLargeSlate);
 
         // Update the elected set to reflect the new order.
-        chief.lift(c4);
+        voteQuorum.lift(c4);
 
         // Now restore the old order using a slate ID.
-        uSmall.doApprove(gov, address(chief), uSmallInitialBalance);
+        uSmall.doApprove(gov, address(voteQuorum), uSmallInitialBalance);
         uSmall.doLock(uSmallInitialBalance);
         uSmall.doVote(slateID);
 
         // Update the elected set to reflect the restored order.
-        chief.lift(c1);
+        voteQuorum.lift(c1);
     }
 
     function testFail_non_hat_can_not_set_roles() public {
@@ -332,13 +332,13 @@ contract DSChiefTest is DSThing, DSTest {
         slate[0] = address(uSmall);
 
         // Upset the order.
-        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
+        uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
         uLarge.doLock(uLargeInitialBalance);
 
         uLarge.doVote(slate);
 
         // Update the elected set to reflect the new order.
-        chief.lift(address(uSmall));
+        voteQuorum.lift(address(uSmall));
 
         uSmall.doSetUserRole(address(uMedium), 1, true);
     }
@@ -352,18 +352,18 @@ contract DSChiefTest is DSThing, DSTest {
         slate[0] = address(uSmall);
 
         // Upset the order.
-        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
+        uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
         uLarge.doLock(uLargeInitialBalance);
 
         uLarge.doVote(slate);
 
         // Update the elected set to reflect the new order.
-        chief.lift(address(uSmall));
+        voteQuorum.lift(address(uSmall));
 
         uSmall.doSetRoleCapability(1, address(uLarge), S("authedFn()"), true);
         uSmall.doSetUserRole(address(this), 1, true);
 
-        uLarge.setAuthority(chief);
+        uLarge.setAuthority(voteQuorum);
         uLarge.setOwner(address(0));
         uLarge.authedFn();
     }
@@ -373,28 +373,28 @@ contract DSChiefTest is DSThing, DSTest {
         slate[0] = address(uSmall);
 
         // Upset the order.
-        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
+        uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
         uLarge.doLock(uLargeInitialBalance);
 
         uLarge.doVote(slate);
 
         // Update the elected set to reflect the new order.
-        chief.lift(address(uSmall));
+        voteQuorum.lift(address(uSmall));
 
         uSmall.doSetPublicCapability(address(uLarge), S("authedFn()"), true);
 
-        uLarge.setAuthority(chief);
+        uLarge.setAuthority(voteQuorum);
         uLarge.setOwner(address(0));
         uLarge.authedFn();
     }
 
-    function test_chief_no_owner() public {
-        assertEq(chief.owner(), address(0));
+    function test_voteQuorum_no_owner() public {
+        assertEq(voteQuorum.owner(), address(0));
     }
 
     function initial_vote() internal returns (bytes32 slateID) {
         uint uMediumLockedAmt = uMediumInitialBalance;
-        uMedium.doApprove(gov, address(chief), uMediumLockedAmt);
+        uMedium.doApprove(gov, address(voteQuorum), uMediumLockedAmt);
         uMedium.doLock(uMediumLockedAmt);
 
         address[] memory uMediumSlate = new address[](3);
@@ -403,7 +403,7 @@ contract DSChiefTest is DSThing, DSTest {
         uMediumSlate[2] = c3;
         slateID = uMedium.doVote(uMediumSlate);
 
-        // Lift the chief.
-        chief.lift(c1);
+        // Lift the voteQuorum.
+        voteQuorum.lift(c1);
     }
 }

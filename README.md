@@ -86,7 +86,7 @@ inherits from `VoteQuorumApprovals`.
 - `votedAuthority`: Contains the address of the current authority (address) that received the most votes.
 - `MAX_CANDIDATES_PER_BALLOT`: Maximum number of candidates a ballot can hold.
 
-Most of the functions are decorated with the the `note` modifier from [ds-note](https://dapp.tools/dappsys/ds-note.html), meaning that they fire a standardized event when called. Additionally, one custom event is also provided:
+Most of the functions are decorated with the the `note` modifier from [ds-note](https://github.com/dapphub/ds-note), meaning that they fire a standardized event when called. Additionally, one custom event is also provided:
 
 - `GroupCandidates(bytes32 indexed ballot)`: Fired when a ballot is created.
 

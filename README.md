@@ -165,4 +165,4 @@ Reverts the transaction. Overridden from `DSRoles`.
 
 ### DSRoles
 
-See [ds-roles](https://dapp.tools/dappsys/ds-roles.html) for inherited features.
+See [ds-roles](https://github.com/reflexer-labs/ds-roles) for inherited features.

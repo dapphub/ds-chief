@@ -12,4 +12,4 @@ tokens any time they lock voting tokens, which is useful for secondary governanc
 The IOU tokens may not be exchanged for the locked tokens except by someone who
 has actually locked funds in the contract, and only up to the amount they have locked.
 
-Check out the full documentation [here](https://docs.reflexer.finance/).
+Check out the full documentation [here](https://docs.reflexer.finance/system-contracts/governance-module/vote-quorum).

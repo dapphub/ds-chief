@@ -34,8 +34,8 @@ The IOU token allows for chaining governance contracts. An arbitrary number of
 `VoteQuorum`, `DSPrism`, or other contracts of that kind may essentially use the
 same governance token by accepting the IOU token of the `VoteQuorum` contract
 before it as a governance token. E.g., given three `VoteQuorum` contracts,
-`voteQuorumA`, `voteQuorumB`, and `voteQuorumC`, with `voteQuorumA.GOV` being the protocol token,
-setting `voteQuorumB.GOV` to `voteQuorumA.IOU` and `voteQuorumC.GOV` to `voteQuorumB.IOU` allows all
+`voteQuorumA`, `voteQuorumB`, and `voteQuorumC`, with `voteQuorumA.PROT` being the protocol token,
+setting `voteQuorumB.PROT` to `voteQuorumA.IOU` and `voteQuorumC.PROT` to `voteQuorumB.IOU` allows all
 three contracts to essentially run using a common pool of tokens.
 
 
@@ -81,8 +81,8 @@ inherits from `VoteQuorumApprovals`.
 - `votes`: A mapping of voter addresses to the ballot they have voted for.
 - `approvals`: A mapping of candidate addresses to their `uint` weight.
 - `deposits`: A mapping of voter addresses to `uint` number of tokens locked.
-- `GOV`: `DSToken` used for voting.
-- `IOU`: `DSToken` issued in exchange for locking `GOV` tokens.
+- `PROT`: `DSToken` used for voting.
+- `IOU`: `DSToken` issued in exchange for locking `PROT` tokens.
 - `votedAuthority`: Contains the address of the current authority (address) that received the most votes.
 - `MAX_CANDIDATES_PER_BALLOT`: Maximum number of candidates a ballot can hold.
 
@@ -92,21 +92,21 @@ Most of the functions are decorated with the the `note` modifier from [ds-note](
 
 Its public functions are as follows:
 
-### `VoteQuorumApprovals(DSToken GOV_, DSToken IOU_, uint MAX_CANDIDATES_PER_BALLOT_)`
+### `VoteQuorumApprovals(DSToken PROT_, DSToken IOU_, uint MAX_CANDIDATES_PER_BALLOT_)`
 
-The constructor.  Sets `GOV`, `IOU`, and `MAX_CANDIDATES_PER_BALLOT`.
+The constructor.  Sets `PROT`, `IOU`, and `MAX_CANDIDATES_PER_BALLOT`.
 
 
 ### `addVotingWeight(uint wad)`
 
-Charges the user `wad` `GOV` tokens, issues an equal amount of `IOU` tokens to
+Charges the user `wad` `PROT` tokens, issues an equal amount of `IOU` tokens to
 the user, and adds `wad` weight to the candidates on the user's selected ballot.
 Fires a `LogLockFree` event.
 
 
 ### `removeVotingWeight(uint wad)`
 
-Charges the user `wad` `IOU` tokens, issues an equal amount of `GOV` tokens to
+Charges the user `wad` `IOU` tokens, issues an equal amount of `PROT` tokens to
 the user, and subtracts `wad` weight from the candidates on the user's selected
 ballot. Fires a `LogLockFree` event.
 
@@ -141,9 +141,9 @@ contract systems.
 Its public functions are as follows:
 
 
-### `VoteQuorum(DSToken GOV_, DSToken IOU_, uint MAX_CANDIDATES_PER_BALLOT_)`
+### `VoteQuorum(DSToken PROT_, DSToken IOU_, uint MAX_CANDIDATES_PER_BALLOT_)`
 
-The constructor.  Sets `GOV`, `IOU`, and `MAX_CANDIDATES_PER_BALLOT`.
+The constructor.  Sets `PROT`, `IOU`, and `MAX_CANDIDATES_PER_BALLOT`.
 
 ### `setOwner(address owner_)`
 

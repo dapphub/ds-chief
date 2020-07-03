@@ -130,7 +130,7 @@ contract VoteQuorumTest is DSThing, DSTest {
     uint256 constant uSmallInitialBalance = initialBalance / 5;
 
     VoteQuorum voteQuorum;
-    DSToken gov;
+    DSToken prot;
     DSToken iou;
 
     // u prefix: user
@@ -139,11 +139,11 @@ contract VoteQuorumTest is DSThing, DSTest {
     VoteQuorumUser uSmall;
 
     function setUp() public {
-        gov = new DSToken("GOV");
-        gov.mint(initialBalance);
+        prot = new DSToken("PROT");
+        prot.mint(initialBalance);
 
         VoteQuorumFactory fab = new VoteQuorumFactory();
-        voteQuorum = fab.newVoteQuorum(gov, electionSize);
+        voteQuorum = fab.newVoteQuorum(prot, electionSize);
         iou = voteQuorum.IOU();
 
         uLarge = new VoteQuorumUser(voteQuorum);
@@ -154,9 +154,9 @@ contract VoteQuorumTest is DSThing, DSTest {
                uSmallInitialBalance);
         assert(uLargeInitialBalance < uMediumInitialBalance + uSmallInitialBalance);
 
-        gov.transfer(address(uLarge), uLargeInitialBalance);
-        gov.transfer(address(uMedium), uMediumInitialBalance);
-        gov.transfer(address(uSmall), uSmallInitialBalance);
+        prot.transfer(address(uLarge), uLargeInitialBalance);
+        prot.transfer(address(uMedium), uMediumInitialBalance);
+        prot.transfer(address(uSmall), uSmallInitialBalance);
     }
 
     function test_basic_sanity() public pure {
@@ -200,19 +200,19 @@ contract VoteQuorumTest is DSThing, DSTest {
     }
 
     function test_add_weight_debits_user() public {
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
+        assert(prot.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         uint lockedAmt = uLargeInitialBalance / 10;
-        uLarge.doApprove(gov, address(voteQuorum), lockedAmt);
+        uLarge.doApprove(prot, address(voteQuorum), lockedAmt);
         uLarge.doAddVotingWeight(lockedAmt);
 
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance - lockedAmt);
+        assert(prot.balanceOf(address(uLarge)) == uLargeInitialBalance - lockedAmt);
     }
 
     function test_changing_weight_after_voting() public {
         uint uLargeLockedAmt = uLargeInitialBalance / 2;
         uLarge.doApprove(iou, address(voteQuorum), uLargeLockedAmt);
-        uLarge.doApprove(gov, address(voteQuorum), uLargeLockedAmt);
+        uLarge.doApprove(prot, address(voteQuorum), uLargeLockedAmt);
         uLarge.doAddVotingWeight(uLargeLockedAmt);
 
         address[] memory uLargeSlate = new address[](1);
@@ -226,20 +226,20 @@ contract VoteQuorumTest is DSThing, DSTest {
         assert(voteQuorum.approvals(c1) == 0);
 
         uLargeLockedAmt = uLargeInitialBalance / 4;
-        uLarge.doApprove(gov, address(voteQuorum), uLargeLockedAmt);
+        uLarge.doApprove(prot, address(voteQuorum), uLargeLockedAmt);
         uLarge.doAddVotingWeight(uLargeLockedAmt);
 
         assert(voteQuorum.approvals(c1) == uLargeLockedAmt);
     }
 
     function test_voting_and_reordering() public {
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
+        assert(prot.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         initial_vote();
 
         // Upset the order.
         uint uLargeLockedAmt = uLargeInitialBalance;
-        uLarge.doApprove(gov, address(voteQuorum), uLargeLockedAmt);
+        uLarge.doApprove(prot, address(voteQuorum), uLargeLockedAmt);
         uLarge.doAddVotingWeight(uLargeLockedAmt);
 
         address[] memory uLargeSlate = new address[](1);
@@ -251,7 +251,7 @@ contract VoteQuorumTest is DSThing, DSTest {
         initial_vote();
 
         // Upset the order.
-        uSmall.doApprove(gov, address(voteQuorum), uSmallInitialBalance);
+        uSmall.doApprove(prot, address(voteQuorum), uSmallInitialBalance);
         uSmall.doAddVotingWeight(uSmallInitialBalance);
 
         address[] memory uSmallSlate = new address[](1);
@@ -267,7 +267,7 @@ contract VoteQuorumTest is DSThing, DSTest {
         initial_vote();
 
         // Upset the order.
-        uSmall.doApprove(gov, address(voteQuorum), uSmallInitialBalance);
+        uSmall.doApprove(prot, address(voteQuorum), uSmallInitialBalance);
         uSmall.doAddVotingWeight(uSmallInitialBalance);
 
         address[] memory uSmallSlate = new address[](1);
@@ -285,7 +285,7 @@ contract VoteQuorumTest is DSThing, DSTest {
     }
 
     function testFail_voting_and_reordering_without_weight() public {
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
+        assert(prot.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         initial_vote();
 
@@ -299,12 +299,12 @@ contract VoteQuorumTest is DSThing, DSTest {
     }
 
     function test_voting_by_ballot_id() public {
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
+        assert(prot.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         bytes32 ballotID = initial_vote();
 
         // Upset the order.
-        uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
+        uLarge.doApprove(prot, address(voteQuorum), uLargeInitialBalance);
         uLarge.doAddVotingWeight(uLargeInitialBalance);
 
         address[] memory uLargeSlate = new address[](1);
@@ -315,7 +315,7 @@ contract VoteQuorumTest is DSThing, DSTest {
         voteQuorum.electCandidate(c4);
 
         // Now restore the old order using a ballot ID.
-        uSmall.doApprove(gov, address(voteQuorum), uSmallInitialBalance);
+        uSmall.doApprove(prot, address(voteQuorum), uSmallInitialBalance);
         uSmall.doAddVotingWeight(uSmallInitialBalance);
         uSmall.doVote(ballotID);
 
@@ -332,7 +332,7 @@ contract VoteQuorumTest is DSThing, DSTest {
         ballot[0] = address(uSmall);
 
         // Upset the order.
-        uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
+        uLarge.doApprove(prot, address(voteQuorum), uLargeInitialBalance);
         uLarge.doAddVotingWeight(uLargeInitialBalance);
 
         uLarge.doVote(ballot);
@@ -352,7 +352,7 @@ contract VoteQuorumTest is DSThing, DSTest {
         ballot[0] = address(uSmall);
 
         // Upset the order.
-        uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
+        uLarge.doApprove(prot, address(voteQuorum), uLargeInitialBalance);
         uLarge.doAddVotingWeight(uLargeInitialBalance);
 
         uLarge.doVote(ballot);
@@ -373,7 +373,7 @@ contract VoteQuorumTest is DSThing, DSTest {
         ballot[0] = address(uSmall);
 
         // Upset the order.
-        uLarge.doApprove(gov, address(voteQuorum), uLargeInitialBalance);
+        uLarge.doApprove(prot, address(voteQuorum), uLargeInitialBalance);
         uLarge.doAddVotingWeight(uLargeInitialBalance);
 
         uLarge.doVote(ballot);
@@ -394,7 +394,7 @@ contract VoteQuorumTest is DSThing, DSTest {
 
     function initial_vote() internal returns (bytes32 ballotID) {
         uint uMediumLockedAmt = uMediumInitialBalance;
-        uMedium.doApprove(gov, address(voteQuorum), uMediumLockedAmt);
+        uMedium.doApprove(prot, address(voteQuorum), uMediumLockedAmt);
         uMedium.doAddVotingWeight(uMediumLockedAmt);
 
         address[] memory uMediumSlate = new address[](3);

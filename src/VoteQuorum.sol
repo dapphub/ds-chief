@@ -29,8 +29,8 @@ contract VoteQuorumApprovals is DSThing {
     mapping(address=>bytes32) public votes;
     mapping(address=>uint256) public approvals;
     mapping(address=>uint256) public deposits;
-    DSToken public GOV; // voting token that gets locked up
-    DSToken public IOU; // non-voting representation of a token, for e.g. secondary voting mechanisms
+    DSToken public PROT; // protocol token that gets locked up
+    DSToken public IOU;  // non-voting representation of a token, for e.g. secondary voting mechanisms
     address public votedAuthority; // the quorum's chosen authority
 
     uint256 public MAX_CANDIDATES_PER_BALLOT;
@@ -39,9 +39,9 @@ contract VoteQuorumApprovals is DSThing {
 
     // IOU constructed outside this contract reduces deployment costs significantly
     // addVotingWeight/removeVotingWeight/vote are quite sensitive to token invariants. Caution is advised.
-    constructor(DSToken GOV_, DSToken IOU_, uint MAX_CANDIDATES_PER_BALLOT_) public
+    constructor(DSToken PROT_, DSToken IOU_, uint MAX_CANDIDATES_PER_BALLOT_) public
     {
-        GOV = GOV_;
+        PROT = PROT_;
         IOU = IOU_;
         MAX_CANDIDATES_PER_BALLOT = MAX_CANDIDATES_PER_BALLOT_;
     }
@@ -50,7 +50,7 @@ contract VoteQuorumApprovals is DSThing {
         public
         note
     {
-        GOV.pull(msg.sender, wad);
+        PROT.pull(msg.sender, wad);
         IOU.mint(msg.sender, wad);
         deposits[msg.sender] = add(deposits[msg.sender], wad);
         addWeight(wad, votes[msg.sender]);
@@ -63,7 +63,7 @@ contract VoteQuorumApprovals is DSThing {
         deposits[msg.sender] = sub(deposits[msg.sender], wad);
         subWeight(wad, votes[msg.sender]);
         IOU.burn(msg.sender, wad);
-        GOV.push(msg.sender, wad);
+        PROT.push(msg.sender, wad);
     }
 
     function groupCandidates(address[] memory candidates)
@@ -146,8 +146,8 @@ contract VoteQuorumApprovals is DSThing {
 // unique owner of role 0 (typically 'sys' or 'internal')
 contract VoteQuorum is DSRoles, VoteQuorumApprovals {
 
-    constructor(DSToken GOV, DSToken IOU, uint MAX_CANDIDATES_PER_BALLOT)
-             VoteQuorumApprovals (GOV, IOU, MAX_CANDIDATES_PER_BALLOT)
+    constructor(DSToken PROT, DSToken IOU, uint MAX_CANDIDATES_PER_BALLOT)
+             VoteQuorumApprovals (PROT, IOU, MAX_CANDIDATES_PER_BALLOT)
         public
     {
         authority = this;

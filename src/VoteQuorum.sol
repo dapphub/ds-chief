@@ -35,7 +35,12 @@ contract VoteQuorumApprovals is DSThing {
 
     uint256 public MAX_CANDIDATES_PER_BALLOT;
 
-    event GroupCandidates(bytes32 indexed ballot);
+    event AddVotingWeight(address voter, uint wad);
+    event RemoveVotingWeight(address voter, uint wad);
+    event GroupCandidates(address[] candidates, bytes32 indexed ballot);
+    event Vote(address voter, address[] candidates, bytes32 indexed ballot);
+    event Vote(address voter, bytes32 indexed ballot);
+    event ElectCandidate(address sender, address whom);
 
     // IOU constructed outside this contract reduces deployment costs significantly
     // addVotingWeight/removeVotingWeight/vote are quite sensitive to token invariants. Caution is advised.
@@ -54,6 +59,7 @@ contract VoteQuorumApprovals is DSThing {
         IOU.mint(msg.sender, wad);
         deposits[msg.sender] = add(deposits[msg.sender], wad);
         addWeight(wad, votes[msg.sender]);
+        emit AddVotingWeight(msg.sender, wad);
     }
 
     function removeVotingWeight(uint wad)
@@ -64,6 +70,7 @@ contract VoteQuorumApprovals is DSThing {
         subWeight(wad, votes[msg.sender]);
         IOU.burn(msg.sender, wad);
         PROT.push(msg.sender, wad);
+        emit RemoveVotingWeight(msg.sender, wad);
     }
 
     function groupCandidates(address[] memory candidates)
@@ -76,7 +83,7 @@ contract VoteQuorumApprovals is DSThing {
 
         bytes32 _hash = keccak256(abi.encodePacked(candidates));
         ballots[_hash] = candidates;
-        emit GroupCandidates(_hash);
+        emit GroupCandidates(candidates, _hash);
         return _hash;
     }
 
@@ -85,6 +92,7 @@ contract VoteQuorumApprovals is DSThing {
     {
         bytes32 ballot = groupCandidates(candidates);
         vote(ballot);
+        emit Vote(msg.sender, candidates, ballot);
         return ballot;
     }
 
@@ -98,6 +106,7 @@ contract VoteQuorumApprovals is DSThing {
         subWeight(weight, votes[msg.sender]);
         votes[msg.sender] = ballot;
         addWeight(weight, votes[msg.sender]);
+        emit Vote(msg.sender, ballot);
     }
 
     function electCandidate(address whom)
@@ -106,6 +115,7 @@ contract VoteQuorumApprovals is DSThing {
     {
         require(approvals[whom] > approvals[votedAuthority]);
         votedAuthority = whom;
+        emit ElectCandidate(msg.sender, whom);
     }
 
     function addWeight(uint weight, bytes32 ballot)
@@ -179,9 +189,12 @@ contract VoteQuorum is DSRoles, VoteQuorumApprovals {
 }
 
 contract VoteQuorumFactory {
+    event NewVoteQuorum(address gov, address iou, address voteQuorum, uint MAX_CANDIDATES_PER_BALLOT);
+
     function newVoteQuorum(DSToken gov, uint MAX_CANDIDATES_PER_BALLOT) public returns (VoteQuorum voteQuorum) {
         DSToken iou = new DSToken('IOU');
         voteQuorum = new VoteQuorum(gov, iou, MAX_CANDIDATES_PER_BALLOT);
         iou.setOwner(address(voteQuorum));
+        emit NewVoteQuorum(address(gov), address(iou), address(voteQuorum), MAX_CANDIDATES_PER_BALLOT);
     }
 }

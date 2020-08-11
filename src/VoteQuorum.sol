@@ -53,7 +53,6 @@ contract VoteQuorumApprovals is DSThing {
 
     function addVotingWeight(uint wad)
         public
-        note
     {
         PROT.pull(msg.sender, wad);
         IOU.mint(msg.sender, wad);
@@ -64,7 +63,6 @@ contract VoteQuorumApprovals is DSThing {
 
     function removeVotingWeight(uint wad)
         public
-        note
     {
         deposits[msg.sender] = sub(deposits[msg.sender], wad);
         subWeight(wad, votes[msg.sender]);
@@ -75,7 +73,6 @@ contract VoteQuorumApprovals is DSThing {
 
     function groupCandidates(address[] memory candidates)
         public
-        note
         returns (bytes32 ballot)
     {
         require( candidates.length <= MAX_CANDIDATES_PER_BALLOT );
@@ -98,7 +95,6 @@ contract VoteQuorumApprovals is DSThing {
 
     function vote(bytes32 ballot)
         public
-        note
     {
         require(ballots[ballot].length > 0 ||
             ballot == 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470, "ds-vote-quorum-invalid-ballot");
@@ -111,7 +107,6 @@ contract VoteQuorumApprovals is DSThing {
 
     function electCandidate(address whom)
         public
-        note
     {
         require(approvals[whom] > approvals[votedAuthority]);
         votedAuthority = whom;

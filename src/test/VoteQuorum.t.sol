@@ -21,7 +21,7 @@ import "ds-test/test.sol";
 import "ds-token/token.sol";
 import "ds-thing/thing.sol";
 
-import "./VoteQuorum.sol";
+import "../VoteQuorum.sol";
 
 contract VoteQuorumUser is DSThing {
     VoteQuorum voteQuorum;

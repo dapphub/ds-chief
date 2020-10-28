@@ -35,6 +35,12 @@ contract DSChiefApprovals is DSThing {
 
     uint256 public MAX_YAYS;
 
+    mapping(address=>uint256) public last;
+
+    bool public live;
+
+    uint256 constant LAUNCH_THRESHOLD = 100000 ether; // 100K MKR launch threshold
+
     event Etch(bytes32 indexed slate);
 
     // IOU constructed outside this contract reduces deployment costs significantly
@@ -46,10 +52,20 @@ contract DSChiefApprovals is DSThing {
         MAX_YAYS = MAX_YAYS_;
     }
 
+    function launch()
+        public
+        note
+    {
+        require(!live);
+        require(hat == address(0) && approvals[address(0)] >= LAUNCH_THRESHOLD);
+        live = true;
+    }
+
     function lock(uint wad)
         public
         note
     {
+        last[msg.sender] = block.number;
         GOV.pull(msg.sender, wad);
         IOU.mint(msg.sender, wad);
         deposits[msg.sender] = add(deposits[msg.sender], wad);
@@ -60,6 +76,7 @@ contract DSChiefApprovals is DSThing {
         public
         note
     {
+        require(block.number > last[msg.sender]);
         deposits[msg.sender] = sub(deposits[msg.sender], wad);
         subWeight(wad, votes[msg.sender]);
         IOU.burn(msg.sender, wad);
@@ -169,7 +186,7 @@ contract DSChief is DSRoles, DSChiefApprovals {
         public view
         returns (bool)
     {
-        return (who == hat);
+        return (live && who == hat);
     }
     function setRootUser(address who, bool enabled) public {
         who; enabled;

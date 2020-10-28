@@ -23,6 +23,10 @@ import "ds-thing/thing.sol";
 
 import "./chief.sol";
 
+interface Hevm {
+    function roll(uint) external;
+}
+
 contract ChiefUser is DSThing {
     DSChief chief;
 
@@ -112,6 +116,7 @@ contract ChiefUser is DSThing {
 }
 
 contract DSChiefTest is DSThing, DSTest {
+    Hevm hevm;
     uint256 constant electionSize = 3;
 
     // c prefix: candidate
@@ -124,7 +129,7 @@ contract DSChiefTest is DSThing, DSTest {
     address constant c7 = address(0x7);
     address constant c8 = address(0x8);
     address constant c9 = address(0x9);
-    uint256 constant initialBalance = 1000 ether;
+    uint256 constant initialBalance = 1000000 ether;
     uint256 constant uLargeInitialBalance = initialBalance / 3;
     uint256 constant uMediumInitialBalance = initialBalance / 4;
     uint256 constant uSmallInitialBalance = initialBalance / 5;
@@ -139,6 +144,8 @@ contract DSChiefTest is DSThing, DSTest {
     ChiefUser uSmall;
 
     function setUp() public {
+        hevm = Hevm(address(bytes20(uint160(uint256(keccak256('hevm cheat code'))))));
+
         gov = new DSToken("GOV");
         gov.mint(initialBalance);
 
@@ -157,14 +164,25 @@ contract DSChiefTest is DSThing, DSTest {
         gov.transfer(address(uLarge), uLargeInitialBalance);
         gov.transfer(address(uMedium), uMediumInitialBalance);
         gov.transfer(address(uSmall), uSmallInitialBalance);
+        hevm.roll(1); // Block number = 1
     }
 
-    function test_basic_sanity() public pure {
-        assert(true);
+    function enable_system() internal {
+        address[] memory slate = new address[](1);
+        slate[0] = address(0);
+        gov.approve(address(chief), 100000 ether);
+        chief.lock(100000 ether);
+        chief.vote(slate);
+        chief.launch();
     }
 
-    function testFail_basic_sanity() public pure {
-        assert(false);
+    function testFail_enable_system() public {
+        address[] memory slate = new address[](1);
+        slate[0] = address(0);
+        gov.approve(address(chief), 100000 ether);
+        chief.lock(100000 ether - 1);
+        chief.vote(slate);
+        chief.launch();
     }
 
     function test_etch_returns_same_id_for_same_sets() public {
@@ -174,7 +192,7 @@ contract DSChiefTest is DSThing, DSTest {
         candidates[2] = c3;
 
         bytes32 id = uSmall.doEtch(candidates);
-        assert(id != 0x0);
+        assertTrue(id != 0x0);
         assertEq32(id, uMedium.doEtch(candidates));
     }
 
@@ -200,13 +218,30 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_lock_debits_user() public {
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
+        assertTrue(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         uint lockedAmt = uLargeInitialBalance / 10;
         uLarge.doApprove(gov, address(chief), lockedAmt);
         uLarge.doLock(lockedAmt);
 
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance - lockedAmt);
+        assertTrue(gov.balanceOf(address(uLarge)) == uLargeInitialBalance - lockedAmt);
+    }
+
+    function test_free_after_lock() public {
+        uint uLargeLockedAmt = uLargeInitialBalance / 2;
+        uLarge.doApprove(iou, address(chief), uLargeLockedAmt);
+        uLarge.doApprove(gov, address(chief), uLargeLockedAmt);
+        uLarge.doLock(uLargeLockedAmt);
+        hevm.roll(2);
+        uLarge.doFree(uLargeLockedAmt);
+    }
+
+    function testFail_free_after_lock_same_block() public {
+        uint uLargeLockedAmt = uLargeInitialBalance / 2;
+        uLarge.doApprove(iou, address(chief), uLargeLockedAmt);
+        uLarge.doApprove(gov, address(chief), uLargeLockedAmt);
+        uLarge.doLock(uLargeLockedAmt);
+        uLarge.doFree(uLargeLockedAmt);
     }
 
     function test_changing_weight_after_voting() public {
@@ -219,21 +254,22 @@ contract DSChiefTest is DSThing, DSTest {
         uLargeSlate[0] = c1;
         uLarge.doVote(uLargeSlate);
 
-        assert(chief.approvals(c1) == uLargeLockedAmt);
+        assertTrue(chief.approvals(c1) == uLargeLockedAmt);
 
         // Changing weight should update the weight of our candidate.
+        hevm.roll(2);
         uLarge.doFree(uLargeLockedAmt);
-        assert(chief.approvals(c1) == 0);
+        assertTrue(chief.approvals(c1) == 0);
 
         uLargeLockedAmt = uLargeInitialBalance / 4;
         uLarge.doApprove(gov, address(chief), uLargeLockedAmt);
         uLarge.doLock(uLargeLockedAmt);
 
-        assert(chief.approvals(c1) == uLargeLockedAmt);
+        assertTrue(chief.approvals(c1) == uLargeLockedAmt);
     }
 
     function test_voting_and_reordering() public {
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
+        assertTrue(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         initial_vote();
 
@@ -263,7 +299,34 @@ contract DSChiefTest is DSThing, DSTest {
         chief.lift(c3);
     }
 
+    function test_auth_enabled_system() public {
+        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
+        uLarge.doLock(uLargeInitialBalance);
+
+        address[] memory uLargeSlate = new address[](1);
+        uLargeSlate[0] = c1;
+        uLarge.doVote(uLargeSlate);
+
+        enable_system();
+
+        chief.lift(c1);
+        assertTrue(chief.isUserRoot(c1));
+    }
+
+    function testFail_auth_not_enabled_system() public {
+        uLarge.doApprove(gov, address(chief), uLargeInitialBalance);
+        uLarge.doLock(uLargeInitialBalance);
+
+        address[] memory uLargeSlate = new address[](1);
+        uLargeSlate[0] = c1;
+        uLarge.doVote(uLargeSlate);
+
+        chief.lift(c1);
+        assertTrue(chief.isUserRoot(c1));
+    }
+
     function test_lift_half_approvals() public {
+        enable_system();
         initial_vote();
 
         // Upset the order.
@@ -275,17 +338,18 @@ contract DSChiefTest is DSThing, DSTest {
         uSmall.doVote(uSmallSlate);
 
         uMedium.doApprove(iou, address(chief), uMediumInitialBalance);
+        hevm.roll(2);
         uMedium.doFree(uMediumInitialBalance);
 
         chief.lift(c3);
 
-        assert(!chief.isUserRoot(c1));
-        assert(!chief.isUserRoot(c2));
-        assert(chief.isUserRoot(c3));
+        assertTrue(!chief.isUserRoot(c1));
+        assertTrue(!chief.isUserRoot(c2));
+        assertTrue(chief.isUserRoot(c3));
     }
 
     function testFail_voting_and_reordering_without_weight() public {
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
+        assertTrue(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         initial_vote();
 
@@ -299,7 +363,7 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_voting_by_slate_id() public {
-        assert(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
+        assertTrue(gov.balanceOf(address(uLarge)) == uLargeInitialBalance);
 
         bytes32 slateID = initial_vote();
 
@@ -328,6 +392,7 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_hat_can_set_roles() public {
+        enable_system();
         address[] memory slate = new address[](1);
         slate[0] = address(uSmall);
 
@@ -348,6 +413,7 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_hat_can_set_role_capability() public {
+        enable_system();
         address[] memory slate = new address[](1);
         slate[0] = address(uSmall);
 
@@ -369,6 +435,7 @@ contract DSChiefTest is DSThing, DSTest {
     }
 
     function test_hat_can_set_public_capability() public {
+        enable_system();
         address[] memory slate = new address[](1);
         slate[0] = address(uSmall);
 

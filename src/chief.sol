@@ -39,7 +39,7 @@ contract DSChiefApprovals is DSThing {
 
     bool public live;
 
-    uint256 constant LAUNCH_THRESHOLD = 100000 ether; // 100K MKR launch threshold
+    uint256 constant LAUNCH_THRESHOLD = 100000 * 10 ** 18; // 100K MKR launch threshold
 
     event Etch(bytes32 indexed slate);
 

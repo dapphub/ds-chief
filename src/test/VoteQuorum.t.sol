@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity >=0.6.7;
+pragma solidity 0.6.7;
 
 import "ds-test/test.sol";
 import "ds-token/token.sol";
@@ -139,7 +139,7 @@ contract VoteQuorumTest is DSThing, DSTest {
     VoteQuorumUser uSmall;
 
     function setUp() public {
-        prot = new DSToken("PROT");
+        prot = new DSToken("PROT", "PROT");
         prot.mint(initialBalance);
 
         VoteQuorumFactory fab = new VoteQuorumFactory();

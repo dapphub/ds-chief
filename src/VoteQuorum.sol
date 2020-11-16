@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity >=0.6.7;
+pragma solidity 0.6.7;
 
 import 'ds-token/token.sol';
 import 'ds-roles/roles.sol';
@@ -187,7 +187,7 @@ contract VoteQuorumFactory {
     event NewVoteQuorum(address gov, address iou, address voteQuorum, uint MAX_CANDIDATES_PER_BALLOT);
 
     function newVoteQuorum(DSToken gov, uint MAX_CANDIDATES_PER_BALLOT) public returns (VoteQuorum voteQuorum) {
-        DSToken iou = new DSToken('IOU');
+        DSToken iou = new DSToken('IOU', 'IOU');
         voteQuorum = new VoteQuorum(gov, iou, MAX_CANDIDATES_PER_BALLOT);
         iou.setOwner(address(voteQuorum));
         emit NewVoteQuorum(address(gov), address(iou), address(voteQuorum), MAX_CANDIDATES_PER_BALLOT);

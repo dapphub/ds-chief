@@ -1,3 +1,5 @@
+import 'ds-roles/roles.sol';
+
 // Copyright 2020 Compound Labs, Inc.
 //
 // Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
@@ -13,20 +15,18 @@
 pragma solidity 0.6.7;
 pragma experimental ABIEncoderV2;
 
-interface DSTokenInterface {
+interface IDSDelegateToken {
     function totalSupply() external view returns (uint);
     function getPriorVotes(address account, uint blockNumber) external view returns (uint256);
 }
 
-contract DelegateVoteQuorum {
+contract DelegateVoteQuorum is DSRoles {
     /// @notice The name of this contract
     string                     public name;
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     uint256                    public quorumVotes;
     /// @notice The number of votes required in order for a voter to become a proposer
     uint256                    public proposalThreshold;
-    /// @notice The maximum number of actions that can be included in a proposal
-    uint256                    public proposalMaxOperations;
     /// @notice The duration of voting on a proposal, in blocks
     uint256                    public votingPeriod;
     /// @notice Total lifetime for a proposal from the moment it's proposed (in blocks)
@@ -38,7 +38,9 @@ contract DelegateVoteQuorum {
     /// @notice The latest proposal for each proposer
     mapping (address => uint)  public latestProposalIds;
     /// @notice The address of the protocol token
-    DSTokenInterface           public protocolToken;
+    IDSDelegateToken           public protocolToken;
+    /// @notice The address of DSPause
+    address                    public pause;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
@@ -47,14 +49,11 @@ contract DelegateVoteQuorum {
         /// @notice Creator of the proposal
         address proposer;
 
-        /// @notice the ordered list of target addresses for calls to be made
-        address[] targets;
+        /// @notice the target addresses for the call to be made
+        address target;
 
-        /// @notice The ordered list of function signatures to be called
-        string[] signatures;
-
-        /// @notice The ordered list of calldata to be passed to each call
-        bytes[] calldatas;
+        /// @notice The calldata to be passed to the call
+        bytes data;
 
         /// @notice The block at which voting begins: holders must delegate their votes prior to this block
         uint startBlock;
@@ -74,8 +73,8 @@ contract DelegateVoteQuorum {
         /// @notice Flag marking whether the proposal has been canceled
         bool canceled;
 
-        /// @notice Flag marking whether the proposal has been executed
-        bool executed;
+        /// @notice Flag marking whether the proposal has been scheduled in DSPause
+        bool scheduled;
 
         /// @notice Receipts of ballots for the entire set of voters
         mapping (address => Receipt) receipts;
@@ -100,7 +99,7 @@ contract DelegateVoteQuorum {
         Defeated,
         Succeeded,
         Expired,
-        Executed,
+        Scheduled,
         Null
     }
 
@@ -112,7 +111,7 @@ contract DelegateVoteQuorum {
     bytes32 public constant BALLOT_TYPEHASH = keccak256("Ballot(uint256 proposalId,bool support)");
 
     /// @notice An event emitted when a new proposal is created
-    event ProposalCreated(uint id, address proposer, address[] targets, string[] signatures, bytes[] calldatas, uint startBlock, uint voteEndBlock, uint lifetimeEndBlock, string description);
+    event ProposalCreated(uint id, address proposer, address target, bytes data, uint startBlock, uint voteEndBlock, uint lifetimeEndBlock, string description);
     /// @notice An event emitted when a vote has been cast on a proposal
     event VoteCast(address voter, uint proposalId, bool support, uint votes);
     /// @notice An event emitted when a proposal has been executed in DSPause
@@ -124,23 +123,24 @@ contract DelegateVoteQuorum {
       string memory name_,
       uint256 quorumVotes_,
       uint256 proposalThreshold_,
-      uint256 proposalMaxOperations_,
       uint256 votingPeriod_,
       uint256 proposalLifetime_,
-      address protocolToken_
+      address protocolToken_,
+      address pauseAddress
     ) public {
-        protocolToken         = DSTokenInterface(protocolToken_);
         require(both(quorumVotes_ > 0, quorumVotes_ < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-quorum-votes");
         require(both(proposalThreshold_ > 0, proposalThreshold_ < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-proposal-threshold");
-        require(both(proposalMaxOperations_ > 0, proposalMaxOperations_ <= 10), "DelegateVoteQuorum/invalid-max-ops");
         require(votingPeriod_ > 0, "DelegateVoteQuorum/invalid-voting-period");
         require(proposalLifetime_ > votingPeriod_, "DelegateVoteQuorum/invalid-proposal-lifetime");
+        protocolToken         = IDSDelegateToken(protocolToken_);
+        pause                 = pauseAddress;
         name                  = name_;
         quorumVotes           = quorumVotes_;
         proposalThreshold     = proposalThreshold_;
-        proposalMaxOperations = proposalMaxOperations_;
         votingPeriod          = votingPeriod_;
     }
+
+    // --- Admin ---
 
     // --- Boolean Logic ---
     function both(bool x, bool y) internal pure returns (bool z) {
@@ -148,11 +148,8 @@ contract DelegateVoteQuorum {
     }
 
     // --- Core Logic ---
-    function propose(address[] memory targets, string[] memory signatures, bytes[] memory calldatas, string memory description) public returns (uint) {
+    function propose(bytes memory data, string memory description) public returns (uint) {
         require(protocolToken.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold, "DelegateVoteQuorum/proposer-votes-below-threshold");
-        require(both(targets.length == signatures.length, targets.length == calldatas.length), "DelegateVoteQuorum/proposal-function-information-mismatch");
-        require(targets.length != 0, "DelegateVoteQuorum/must-provide-actions");
-        require(targets.length <= proposalMaxOperations, "DelegateVoteQuorum/too-many-actions");
 
         uint latestProposalId = latestProposalIds[msg.sender];
         if (latestProposalId != 0) {
@@ -169,51 +166,38 @@ contract DelegateVoteQuorum {
         Proposal memory newProposal = Proposal({
             id: proposalCount,
             proposer: msg.sender,
-            targets: targets,
-            signatures: signatures,
-            calldatas: calldatas,
+            target: address(pause),
+            data: data,
             startBlock: startBlock,
             voteEndBlock: voteEndBlock,
             lifetimeEndBlock: lifetimeEndBlock,
             forVotes: 0,
             againstVotes: 0,
             canceled: false,
-            executed: false
+            scheduled: false
         });
 
         proposals[newProposal.id]               = newProposal;
         latestProposalIds[newProposal.proposer] = newProposal.id;
 
-        emit ProposalCreated(newProposal.id, msg.sender, targets, signatures, calldatas, startBlock, voteEndBlock, lifetimeEndBlock, description);
+        emit ProposalCreated(newProposal.id, msg.sender, address(pause), data, startBlock, voteEndBlock, lifetimeEndBlock, description);
         return newProposal.id;
     }
 
     function execute(uint proposalId) public payable {
         require(state(proposalId) == ProposalState.Succeeded, "DelegateVoteQuorum/proposal-not-succeeded");
         Proposal storage proposal = proposals[proposalId];
-        proposal.executed = true;
+        proposal.scheduled = true;
 
-        // Loop through actions and execute them
-        bool success;
-        bytes memory returnData;
-        bytes memory callData;
-        for (uint i = 0; i < proposal.targets.length; i++) {
-          if (bytes(proposal.signatures[i]).length == 0) {
-              callData = proposal.calldatas[i];
-          } else {
-              callData = abi.encodePacked(bytes4(keccak256(bytes(proposal.signatures[i]))), proposal.calldatas[i]);
-          }
-
-          // solium-disable-next-line security/no-call-value
-          (success, returnData) = proposal.targets[i].call{value: 0}(callData);
-          require(success, "DelegateVoteQuorum/execution-reverted");
-        }
+        // solium-disable-next-line security/no-call-value
+        (bool success, ) = proposal.target.call{value: 0}(proposal.data);
+        require(success, "DelegateVoteQuorum/execution-reverted");
         emit ProposalExecuted(proposalId);
     }
 
     function cancel(uint proposalId) public {
         ProposalState state = state(proposalId);
-        require(state != ProposalState.Executed, "DelegateVoteQuorum/cannot-cancel-executed-proposal");
+        require(state != ProposalState.Scheduled, "DelegateVoteQuorum/cannot-cancel-executed-proposal");
 
         Proposal storage proposal = proposals[proposalId];
         require(protocolToken.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "DelegateVoteQuorum/proposer-above-threshold");
@@ -221,11 +205,6 @@ contract DelegateVoteQuorum {
         proposal.canceled = true;
 
         emit ProposalCanceled(proposalId);
-    }
-
-    function getActions(uint proposalId) public view returns (address[] memory targets, string[] memory signatures, bytes[] memory calldatas) {
-        Proposal storage p = proposals[proposalId];
-        return (p.targets, p.signatures, p.calldatas);
     }
 
     function getReceipt(uint proposalId, address voter) public view returns (Receipt memory) {
@@ -241,8 +220,8 @@ contract DelegateVoteQuorum {
             return ProposalState.Active;
         } else if (proposal.forVotes <= proposal.againstVotes || proposal.forVotes < quorumVotes) {
             return ProposalState.Defeated;
-        } else if (proposal.executed) {
-            return ProposalState.Executed;
+        } else if (proposal.scheduled) {
+            return ProposalState.Scheduled;
         } else if (block.number >= proposal.lifetimeEndBlock) {
             return ProposalState.Expired;
         } else if (both(proposal.forVotes > proposal.againstVotes, proposal.forVotes >= quorumVotes)) {

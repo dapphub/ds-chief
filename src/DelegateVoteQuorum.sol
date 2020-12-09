@@ -15,12 +15,21 @@ import 'ds-roles/roles.sol';
 pragma solidity 0.6.7;
 pragma experimental ABIEncoderV2;
 
+import "ds-token/token.sol";
+
 interface IDSDelegateToken {
     function totalSupply() external view returns (uint);
     function getPriorVotes(address account, uint blockNumber) external view returns (uint256);
 }
 
-contract DelegateVoteQuorum is DSRoles {
+interface IDSPause {
+    function proxy() external view returns (address);
+    function delay() external view returns (uint);
+    function scheduleTransaction(address, bytes32, bytes calldata, uint) external view;
+    function abandonTransaction(address, bytes32, bytes calldata, uint) external view;
+}
+
+contract DelegateVoteQuorum {
     /// @notice The name of this contract
     string                     public name;
     /// @notice The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
@@ -29,6 +38,8 @@ contract DelegateVoteQuorum is DSRoles {
     uint256                    public proposalThreshold;
     /// @notice The duration of voting on a proposal, in blocks
     uint256                    public votingPeriod;
+    /// @notice The delay before voting on a proposal may take place, once proposed
+    uint256                    public votingDelay = 1;
     /// @notice Total lifetime for a proposal from the moment it's proposed (in blocks)
     uint256                    public proposalLifetime;
     /// @notice The total number of proposals
@@ -40,17 +51,28 @@ contract DelegateVoteQuorum is DSRoles {
     /// @notice The address of the protocol token
     IDSDelegateToken           public protocolToken;
     /// @notice The address of DSPause
-    address                    public pause;
+    IDSPause                   public pause;
+    /// @notice Proposals authorized
+    mapping (address => bool)  public authedProposals;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
         uint id;
+
+        /// @notice Type of the proposal
+        ProposalType proposalType;
 
         /// @notice Creator of the proposal
         address proposer;
 
         /// @notice the target addresses for the call to be made
         address target;
+
+        /// @notice The destination of the call (proposal address)
+        address usr;
+
+        /// @notice The codeHash of the destination
+        bytes32 codeHash;
 
         /// @notice The calldata to be passed to the call
         bytes data;
@@ -99,12 +121,17 @@ contract DelegateVoteQuorum is DSRoles {
         Defeated,
         Succeeded,
         Expired,
-        Scheduled,
+        Executed,
         Null
     }
 
-    /// @notice The delay before voting on a proposal may take place, once proposed
-    uint256 public constant votingDelay = 1;
+    /// @notice Possible types of proposal
+    enum ProposalType {
+        Abandon,
+        Schedule,
+        Arbitrary
+    }
+
     /// @notice The EIP-712 typehash for the contract's domain
     bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,uint256 chainId,address verifyingContract)");
     /// @notice The EIP-712 typehash for the ballot struct used by the contract
@@ -118,6 +145,8 @@ contract DelegateVoteQuorum is DSRoles {
     event ProposalExecuted(uint id);
     /// @notice An event emitted when a proposal has been canceled
     event ProposalCanceled(uint id);
+    /// @notice An event emitted when a parameter has been modified
+    event ModifyParameters(bytes32 parameter, uint256 wad);
 
     constructor(
       string memory name_,
@@ -128,19 +157,46 @@ contract DelegateVoteQuorum is DSRoles {
       address protocolToken_,
       address pauseAddress
     ) public {
+        protocolToken         = IDSDelegateToken(protocolToken_);
         require(both(quorumVotes_ > 0, quorumVotes_ < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-quorum-votes");
         require(both(proposalThreshold_ > 0, proposalThreshold_ < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-proposal-threshold");
         require(votingPeriod_ > 0, "DelegateVoteQuorum/invalid-voting-period");
-        require(proposalLifetime_ > votingPeriod_, "DelegateVoteQuorum/invalid-proposal-lifetime");
-        protocolToken         = IDSDelegateToken(protocolToken_);
-        pause                 = pauseAddress;
+        require(proposalLifetime_ > votingPeriod_, "DelegateVoteQuorum/invalid-proposal-lifetime");        
+        pause                 = IDSPause(pauseAddress);
         name                  = name_;
         quorumVotes           = quorumVotes_;
+        proposalLifetime      = proposalLifetime_;
         proposalThreshold     = proposalThreshold_;
         votingPeriod          = votingPeriod_;
     }
 
     // --- Admin ---
+    function canCall(
+        address src, address dst, bytes4 sig
+    ) public view returns (bool) {
+        return src == pause.proxy() && authedProposals[dst] == true;
+    }
+
+    function modifyParameters(bytes32 parameter, uint256 wad) external {
+        require(msg.sender == pause.proxy(), "esm/account-not-authorized");
+        if (parameter == "quorumVotes") {
+            require(both(wad > 0, wad < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-quorum-votes");
+            quorumVotes = wad;
+        } else if (parameter == "proposalThreshold") {
+            require(both(wad > 0, wad < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-proposal-threshold");
+            proposalThreshold = wad;
+        } else if (parameter == "votingPeriod") {
+            require(wad > 0, "DelegateVoteQuorum/invalid-voting-period");
+            votingPeriod = wad;
+        } else if (parameter == "proposalLifetime") {
+            require(wad > votingPeriod, "DelegateVoteQuorum/invalid-proposal-lifetime");
+            proposalLifetime = wad;
+        } else if (parameter == "votingDelay") {
+            require(wad > 1, "DelegateVoteQuorum/invalid-voting-delay");
+            votingDelay = wad;
+        } else revert("esm/modify-unrecognized-param");
+        emit ModifyParameters(parameter, wad);
+    }
 
     // --- Boolean Logic ---
     function both(bool x, bool y) internal pure returns (bool z) {
@@ -148,7 +204,7 @@ contract DelegateVoteQuorum is DSRoles {
     }
 
     // --- Core Logic ---
-    function propose(bytes memory data, string memory description) public returns (uint) {
+    function propose(ProposalType proposalType, address proposalAddress, bytes32 proposalHash, bytes memory data, string memory description) public returns (uint) {
         require(protocolToken.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold, "DelegateVoteQuorum/proposer-votes-below-threshold");
 
         uint latestProposalId = latestProposalIds[msg.sender];
@@ -165,8 +221,11 @@ contract DelegateVoteQuorum is DSRoles {
         proposalCount++;
         Proposal memory newProposal = Proposal({
             id: proposalCount,
+            proposalType: proposalType,
             proposer: msg.sender,
             target: address(pause),
+            usr: proposalAddress,
+            codeHash: proposalHash,
             data: data,
             startBlock: startBlock,
             voteEndBlock: voteEndBlock,
@@ -188,16 +247,21 @@ contract DelegateVoteQuorum is DSRoles {
         require(state(proposalId) == ProposalState.Succeeded, "DelegateVoteQuorum/proposal-not-succeeded");
         Proposal storage proposal = proposals[proposalId];
         proposal.scheduled = true;
-
-        // solium-disable-next-line security/no-call-value
-        (bool success, ) = proposal.target.call{value: 0}(proposal.data);
-        require(success, "DelegateVoteQuorum/execution-reverted");
+        if (proposal.proposalType == ProposalType.Schedule) {
+            pause.scheduleTransaction(proposal.usr, proposal.codeHash, proposal.data, block.timestamp + pause.delay());
+            authedProposals[proposal.usr] = true;
+        } else if (proposal.proposalType == ProposalType.Abandon) {
+            pause.abandonTransaction(proposal.usr, proposal.codeHash, proposal.data, block.timestamp + pause.delay());
+            authedProposals[proposal.usr] = true;
+        } else if (proposal.proposalType == ProposalType.Arbitrary) {
+            address(proposal.usr).call(proposal.data);
+        }
         emit ProposalExecuted(proposalId);
     }
 
     function cancel(uint proposalId) public {
         ProposalState state = state(proposalId);
-        require(state != ProposalState.Scheduled, "DelegateVoteQuorum/cannot-cancel-executed-proposal");
+        require(state != ProposalState.Executed, "DelegateVoteQuorum/cannot-cancel-executed-proposal");
 
         Proposal storage proposal = proposals[proposalId];
         require(protocolToken.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "DelegateVoteQuorum/proposer-above-threshold");
@@ -211,9 +275,10 @@ contract DelegateVoteQuorum is DSRoles {
         return proposals[proposalId].receipts[voter];
     }
 
-    function state(uint proposalId) public view returns (ProposalState) {
+    function state(uint proposalId) public returns (ProposalState) {
         require(proposalCount >= proposalId && proposalId > 0, "DelegateVoteQuorum/invalid-proposal-id");
         Proposal storage proposal = proposals[proposalId];
+        
         if (block.number <= proposal.startBlock) {
             return ProposalState.Pending;
         } else if (block.number <= proposal.voteEndBlock) {
@@ -221,7 +286,7 @@ contract DelegateVoteQuorum is DSRoles {
         } else if (proposal.forVotes <= proposal.againstVotes || proposal.forVotes < quorumVotes) {
             return ProposalState.Defeated;
         } else if (proposal.scheduled) {
-            return ProposalState.Scheduled;
+            return ProposalState.Executed;
         } else if (block.number >= proposal.lifetimeEndBlock) {
             return ProposalState.Expired;
         } else if (both(proposal.forVotes > proposal.againstVotes, proposal.forVotes >= quorumVotes)) {

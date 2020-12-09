@@ -174,7 +174,7 @@ contract DelegateVoteQuorum {
     function canCall(
         address src, address dst, bytes4 sig
     ) public view returns (bool) {
-        return src == pause.proxy() && authedProposals[dst] == true;
+        return true; // src == address(this) && dst == address(pause); //&& sig == 0x7a0c53b2; // scheduleTransaction
     }
 
     function modifyParameters(bytes32 parameter, uint256 wad) external {
@@ -201,6 +201,10 @@ contract DelegateVoteQuorum {
     // --- Boolean Logic ---
     function both(bool x, bool y) internal pure returns (bool z) {
         assembly{ z := and(x, y)}
+    }
+
+    function either(bool x, bool y) internal pure returns (bool z) {
+        assembly{ z := or(x, y)}
     }
 
     // --- Core Logic ---
@@ -275,7 +279,7 @@ contract DelegateVoteQuorum {
         return proposals[proposalId].receipts[voter];
     }
 
-    function state(uint proposalId) public returns (ProposalState) {
+    function state(uint proposalId) public view returns (ProposalState) {
         require(proposalCount >= proposalId && proposalId > 0, "DelegateVoteQuorum/invalid-proposal-id");
         Proposal storage proposal = proposals[proposalId];
         

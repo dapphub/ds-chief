@@ -25,8 +25,8 @@ interface IDSDelegateToken {
 interface IDSPause {
     function proxy() external view returns (address);
     function delay() external view returns (uint);
-    function scheduleTransaction(address, bytes32, bytes calldata, uint) external view;
-    function abandonTransaction(address, bytes32, bytes calldata, uint) external view;
+    function scheduleTransaction(address, bytes32, bytes calldata, uint) external;
+    function abandonTransaction(address, bytes32, bytes calldata, uint) external;
 }
 
 contract DelegateVoteQuorum {
@@ -52,52 +52,36 @@ contract DelegateVoteQuorum {
     IDSDelegateToken           public protocolToken;
     /// @notice The address of DSPause
     IDSPause                   public pause;
-    /// @notice Proposals authorized
-    mapping (address => bool)  public authedProposals;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
         uint id;
-
         /// @notice Type of the proposal
         ProposalType proposalType;
-
         /// @notice Creator of the proposal
         address proposer;
-
         /// @notice the target addresses for the call to be made
         address target;
-
         /// @notice The destination of the call (proposal address)
         address usr;
-
         /// @notice The codeHash of the destination
         bytes32 codeHash;
-
         /// @notice The calldata to be passed to the call
         bytes data;
-
         /// @notice The block at which voting begins: holders must delegate their votes prior to this block
         uint startBlock;
-
         /// @notice The block at which voting ends: votes must be cast prior to this block
         uint voteEndBlock;
-
         /// @notice The block at which the proposal lifetime ends and it's considered expired
         uint lifetimeEndBlock;
-
         /// @notice Current number of votes in favor of this proposal
         uint forVotes;
-
         /// @notice Current number of votes in opposition to this proposal
         uint againstVotes;
-
         /// @notice Flag marking whether the proposal has been canceled
         bool canceled;
-
         /// @notice Flag marking whether the proposal has been scheduled in DSPause
         bool scheduled;
-
         /// @notice Receipts of ballots for the entire set of voters
         mapping (address => Receipt) receipts;
     }
@@ -105,10 +89,8 @@ contract DelegateVoteQuorum {
     struct Receipt {
         /// @notice Whether or not a vote has been cast
         bool hasVoted;
-
         /// @notice Whether or not the voter supports the proposal
         bool support;
-
         /// @notice The number of votes the voter had, which were cast
         uint256 votes;
     }
@@ -171,12 +153,6 @@ contract DelegateVoteQuorum {
     }
 
     // --- Admin ---
-    function canCall(
-        address src, address dst, bytes4 sig
-    ) public view returns (bool) {
-        return true; // src == address(this) && dst == address(pause); //&& sig == 0x7a0c53b2; // scheduleTransaction
-    }
-
     function modifyParameters(bytes32 parameter, uint256 wad) external {
         require(msg.sender == pause.proxy(), "esm/account-not-authorized");
         if (parameter == "quorumVotes") {
@@ -194,8 +170,19 @@ contract DelegateVoteQuorum {
         } else if (parameter == "votingDelay") {
             require(wad > 1, "DelegateVoteQuorum/invalid-voting-delay");
             votingDelay = wad;
-        } else revert("esm/modify-unrecognized-param");
+        } else revert("DelegateVoteQuorum/modify-unrecognized-param");
         emit ModifyParameters(parameter, wad);
+    }
+
+    // --- Util ---
+    function extcodehash(address who) public view returns (bytes32 codehash) {
+        assembly { codehash := extcodehash(who) }
+    }
+
+    function getChainId() internal pure returns (uint) {
+        uint chainId;
+        assembly { chainId := chainid() }
+        return chainId;
     }
 
     // --- Boolean Logic ---
@@ -207,9 +194,29 @@ contract DelegateVoteQuorum {
         assembly{ z := or(x, y)}
     }
 
+    // --- Math ---
+    function add256(uint256 a, uint256 b) internal pure returns (uint) {
+        uint c = a + b;
+        require(c >= a, "DelegateVoteQuorum/addition-overflow");
+        return c;
+    }
+
+    function sub256(uint256 a, uint256 b) internal pure returns (uint) {
+        require(b <= a, "DelegateVoteQuorum/subtraction-underflow");
+        return a - b;
+    }
+
     // --- Core Logic ---
+    /// @notice Create a proposal
+    /// @param proposalType ProposalType
+    /// @param proposalAddress Address of the proposal execution contract
+    /// @param proposalHash extcodehash of the proposal execution contract
+    /// @param data calldata for the call to the proposal contract
+    /// @param description description of the proposal
+    /// @return proposal Id
     function propose(ProposalType proposalType, address proposalAddress, bytes32 proposalHash, bytes memory data, string memory description) public returns (uint) {
         require(protocolToken.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold, "DelegateVoteQuorum/proposer-votes-below-threshold");
+        require(extcodehash(proposalAddress) == proposalHash, "DelegateVoteQuorum/code-hash-does-not-match-target");
 
         uint latestProposalId = latestProposalIds[msg.sender];
         if (latestProposalId != 0) {
@@ -247,38 +254,47 @@ contract DelegateVoteQuorum {
         return newProposal.id;
     }
 
-    function execute(uint proposalId) public payable {
+    /// @notice Create a proposal
+    /// @param proposalId Id of the (succeeded) proposal to be executed
+    function execute(uint proposalId) public {
         require(state(proposalId) == ProposalState.Succeeded, "DelegateVoteQuorum/proposal-not-succeeded");
         Proposal storage proposal = proposals[proposalId];
         proposal.scheduled = true;
         if (proposal.proposalType == ProposalType.Schedule) {
             pause.scheduleTransaction(proposal.usr, proposal.codeHash, proposal.data, block.timestamp + pause.delay());
-            authedProposals[proposal.usr] = true;
         } else if (proposal.proposalType == ProposalType.Abandon) {
             pause.abandonTransaction(proposal.usr, proposal.codeHash, proposal.data, block.timestamp + pause.delay());
-            authedProposals[proposal.usr] = true;
         } else if (proposal.proposalType == ProposalType.Arbitrary) {
-            address(proposal.usr).call(proposal.data);
+            (bool success, ) = address(proposal.usr).call(proposal.data);
+            require(success, "DelegateVoteQuorum/unsuccessful-call");
         }
         emit ProposalExecuted(proposalId);
     }
 
+    /// @notice Cancel a proposal
+    /// @param proposalId Id of the (succeeded) proposal to be executed
     function cancel(uint proposalId) public {
         ProposalState state = state(proposalId);
         require(state != ProposalState.Executed, "DelegateVoteQuorum/cannot-cancel-executed-proposal");
 
         Proposal storage proposal = proposals[proposalId];
         require(protocolToken.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "DelegateVoteQuorum/proposer-above-threshold");
-
         proposal.canceled = true;
 
         emit ProposalCanceled(proposalId);
     }
 
+    /// @notice Get voter receipt for a given proposal
+    /// @param proposalId Id of the proposal
+    /// @param voter Address of the voter
+    /// @return receipt
     function getReceipt(uint proposalId, address voter) public view returns (Receipt memory) {
         return proposals[proposalId].receipts[voter];
     }
 
+    /// @notice Returns state of a proposal
+    /// @param proposalId Id of the proposal
+    /// @return ProposalState
     function state(uint proposalId) public view returns (ProposalState) {
         require(proposalCount >= proposalId && proposalId > 0, "DelegateVoteQuorum/invalid-proposal-id");
         Proposal storage proposal = proposals[proposalId];
@@ -300,10 +316,16 @@ contract DelegateVoteQuorum {
         }
     }
 
+    /// @notice Casts a vote
+    /// @param proposalId Id of the proposal
+    /// @param support true for a pro proposal vote, false for a con vote
     function castVote(uint proposalId, bool support) public {
         return _castVote(msg.sender, proposalId, support);
     }
 
+    /// @notice Casts a meta vote (signed offline, params v, r and s)
+    /// @param proposalId Id of the proposal
+    /// @param support true for a pro proposal vote, false for a con vote
     function castVoteBySig(uint proposalId, bool support, uint8 v, bytes32 r, bytes32 s) public {
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
@@ -313,6 +335,10 @@ contract DelegateVoteQuorum {
         return _castVote(signatory, proposalId, support);
     }
 
+    /// @notice Casts a vote (internal)
+    /// @param voter Address of voter
+    /// @param proposalId Id of the proposal
+    /// @param support true for a pro proposal vote, false for a con vote
     function _castVote(address voter, uint proposalId, bool support) internal {
         require(state(proposalId) == ProposalState.Active, "DelegateVoteQuorum/voting-is-closed");
         Proposal storage proposal = proposals[proposalId];
@@ -325,28 +351,10 @@ contract DelegateVoteQuorum {
         } else {
             proposal.againstVotes = add256(proposal.againstVotes, votes);
         }
-
         receipt.hasVoted = true;
         receipt.support = support;
         receipt.votes = votes;
 
         emit VoteCast(voter, proposalId, support, votes);
-    }
-
-    function add256(uint256 a, uint256 b) internal pure returns (uint) {
-        uint c = a + b;
-        require(c >= a, "DelegateVoteQuorum/addition-overflow");
-        return c;
-    }
-
-    function sub256(uint256 a, uint256 b) internal pure returns (uint) {
-        require(b <= a, "DelegateVoteQuorum/subtraction-underflow");
-        return a - b;
-    }
-
-    function getChainId() internal pure returns (uint) {
-        uint chainId;
-        assembly { chainId := chainid() }
-        return chainId;
     }
 }

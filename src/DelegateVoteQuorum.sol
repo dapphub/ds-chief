@@ -22,11 +22,23 @@ interface IDSDelegateToken {
     function getPriorVotes(address account, uint blockNumber) external view returns (uint256);
 }
 
+interface IDSRoles {
+    function setRootUser(address, bool) external;
+    function isUserRoot(address) external view returns (bool);
+}
+
 interface IDSPause {
     function proxy() external view returns (address);
     function delay() external view returns (uint);
     function scheduleTransaction(address, bytes32, bytes calldata, uint) external;
     function abandonTransaction(address, bytes32, bytes calldata, uint) external;
+    function authority() external view returns (address);
+}
+
+contract SetUserRootProposal {
+    function setRootUser(IDSRoles target, address account, bool isRoot) public {
+        target.setRootUser(account, isRoot);
+    }
 }
 
 contract DelegateVoteQuorum {
@@ -42,6 +54,8 @@ contract DelegateVoteQuorum {
     uint256                    public votingDelay = 1;
     /// @notice Total lifetime for a proposal from the moment it's proposed (in blocks)
     uint256                    public proposalLifetime;
+    /// @notice The address of the Governor Guardian
+    address                    public guardian;
     /// @notice The total number of proposals
     uint256                    public proposalCount;
     /// @notice The official record of all proposals ever proposed
@@ -137,7 +151,8 @@ contract DelegateVoteQuorum {
       uint256 votingPeriod_,
       uint256 proposalLifetime_,
       address protocolToken_,
-      address pauseAddress
+      address pauseAddress,
+      address guardianAddress
     ) public {
         protocolToken         = IDSDelegateToken(protocolToken_);
         require(both(quorumVotes_ > 0, quorumVotes_ < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-quorum-votes");
@@ -150,6 +165,7 @@ contract DelegateVoteQuorum {
         proposalLifetime      = proposalLifetime_;
         proposalThreshold     = proposalThreshold_;
         votingPeriod          = votingPeriod_;
+        guardian              = guardianAddress;
     }
 
     // --- Admin ---
@@ -278,7 +294,7 @@ contract DelegateVoteQuorum {
         require(state != ProposalState.Executed, "DelegateVoteQuorum/cannot-cancel-executed-proposal");
 
         Proposal storage proposal = proposals[proposalId];
-        require(protocolToken.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "DelegateVoteQuorum/proposer-above-threshold");
+        require(msg.sender == guardian || protocolToken.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "DelegateVoteQuorum/proposer-above-threshold");
         proposal.canceled = true;
 
         emit ProposalCanceled(proposalId);
@@ -352,9 +368,46 @@ contract DelegateVoteQuorum {
             proposal.againstVotes = add256(proposal.againstVotes, votes);
         }
         receipt.hasVoted = true;
-        receipt.support = support;
-        receipt.votes = votes;
+        receipt.support  = support;
+        receipt.votes    = votes;
 
         emit VoteCast(voter, proposalId, support, votes);
+    }
+
+
+    // Guardian Functions
+    /// @notice Abdicates the guardian role (onlyGuardian)
+    function abdicate() public {
+        require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
+        guardian = address(0);
+    }
+
+    /// @notice Transfers root access from this contract to another one (onlyGuardian)
+    /// @param account Account to become root in dspause.authority()
+    /// @return revokeProposal address of the proposal to revoke access from this contract
+    /// @return grantProposal address of the proposal to grant root access to address account
+    function transferRootAccess(address account) public returns (address revokeProposal, address grantProposal) {
+        require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
+        revokeProposal = _manageRootAccess(address(this), false);
+        grantProposal  = _manageRootAccess(account, true);
+    }
+
+    /// @notice Grants root access to an account (onlyGuardian)
+    /// @param account Account to become root in dspause.authority()
+    /// @return proposal address of the proposal
+    function manageRootAccess(address account, bool isRoot) public returns (address proposal) {
+        require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
+        proposal = _manageRootAccess(account, isRoot);
+    }
+
+    /// @notice Grants root access to an account (internal)
+    /// @param account Account to become root in dspause.authority()
+    /// @return proposal address of the proposal
+    function _manageRootAccess(address account, bool isRoot) internal returns (address proposal) {
+        proposal = address(new SetUserRootProposal());
+        address usr = proposal;
+        bytes32 codeHash = extcodehash(usr);
+        bytes memory data = abi.encodeWithSignature("setRootUser(address,address,bool)", pause.authority(), account, isRoot);
+        pause.scheduleTransaction( proposal, codeHash, data, block.timestamp + pause.delay());
     }
 }

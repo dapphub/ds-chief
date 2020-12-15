@@ -21,6 +21,7 @@ import "ds-test/test.sol";
 import "ds-token/delegate.sol";
 import "ds-thing/thing.sol";
 import {DSDelegateRoles} from "ds-roles/delegate_roles.sol";
+import {DSRoles} from "ds-roles/roles.sol";
 import "ds-pause/protest-pause.sol";
 
 import "../DelegateVoteQuorum.sol";
@@ -161,7 +162,7 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
 
         govActions = new GovActionsLike();
 
-        DSDelegateRoles roles = new DSDelegateRoles();
+        DSRoles roles = new DSRoles();
         pause = new DSProtestPause(4 hours, delay, msg.sender, roles);
 
         pauseTarget = new Target();
@@ -178,14 +179,17 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
             votingPeriod,
             proposalLifetime,
             address(prot),
-            address(pause)
+            address(pause),
+            address(this) // guardian
         );
 
         govTarget = new Target();
         govTarget.addAuthorization(address(voteQuorum));
         govTarget.removeAuthorization(address(this));
 
-        roles.setRootUser(address(voteQuorum), true);
+        roles.setAuthority(DSAuthority(roles));
+        roles.setRootUser(address(pause.proxy()), true);
+        roles.setRootUser(address(voteQuorum), true);        
 
         uWhale = new VoteQuorumUser(voteQuorum);
         uLarge = new VoteQuorumUser(voteQuorum);
@@ -435,6 +439,29 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
         assertTrue(canceled);
     }
 
+    function  test_owner_cancel() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uMedium));
+        uLarge3.doDelegate(prot, address(uLarge3));
+        uLarge2.doDelegate(prot, address(uLarge2));
+        
+        hevm.roll(block.number + 1);
+        uint proposalId = uLarge.doPropose(voteQuorum, DelegateVoteQuorum.ProposalType.Arbitrary, address(govTarget), voteQuorum.extcodehash(address(govTarget)), bytes(""), "description");
+        uSmall.doDelegate(prot, address(uSmall)); // bumping proposer below the threshold
+        
+        hevm.roll(block.number + voteQuorum.votingDelay() + votingPeriod); // very last block
+        uMedium.doCastVote(voteQuorum, proposalId, true);
+        uLarge.doCastVote(voteQuorum, proposalId, true);
+        uLarge2.doCastVote(voteQuorum, proposalId, true);
+        uLarge3.doCastVote(voteQuorum, proposalId, true);
+        
+        hevm.roll(block.number + 1);
+        voteQuorum.cancel(proposalId); 
+
+        (,,,,,,,,,,,, bool canceled,) = voteQuorum.proposals(proposalId);
+        assertTrue(canceled);
+    }
+
     function  testFail_cancel_above_threshold() public {
         uSmall.doDelegate(prot, address(uLarge));
         uMedium.doDelegate(prot, address(uMedium));
@@ -534,6 +561,39 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
         pause.executeTransaction(usr, voteQuorum.extcodehash(usr), data, block.timestamp);
 
         assertEq(voteQuorum.quorumVotes(), 7000000 ether);
+    }
+
+    function test_abdicate() public {
+        assertEq(voteQuorum.guardian(), address(this));
+        voteQuorum.abdicate();
+        assertEq(voteQuorum.guardian(), address(0));
+    }
+
+    function test_manageRootAccess() public {
+        
+        address usr = voteQuorum.manageRootAccess(address(0xabc), true);
+
+        // data for executing the tx
+        bytes memory data = abi.encodeWithSignature("setRootUser(address,address,bool)", address(pause.authority()), address(0xabc), true);
+        hevm.warp(now + pause.delay());
+        
+        pause.executeTransaction(usr, voteQuorum.extcodehash(usr), data, block.timestamp);
+        assertTrue(IDSRoles(address(pause.authority())).isUserRoot(address(0xabc)));
+    }
+
+    function test_transferRootAccess() public {
+        
+        (address revokeProposal, address grantProposal) = voteQuorum.transferRootAccess(address(0xabc));
+
+        // data for executing the tx
+        bytes memory revokeData = abi.encodeWithSignature("setRootUser(address,address,bool)", address(pause.authority()), address(voteQuorum), false);
+        bytes memory grantData  = abi.encodeWithSignature("setRootUser(address,address,bool)", address(pause.authority()), address(0xabc), true);
+        hevm.warp(now + pause.delay());
+        
+        pause.executeTransaction(revokeProposal, voteQuorum.extcodehash(revokeProposal), revokeData, block.timestamp);
+        pause.executeTransaction(grantProposal, voteQuorum.extcodehash(grantProposal), grantData, block.timestamp);
+        assertTrue(IDSRoles(address(pause.authority())).isUserRoot(address(0xabc)));
+        assertTrue(!IDSRoles(address(pause.authority())).isUserRoot(address(voteQuorum)));
     }
 
 }

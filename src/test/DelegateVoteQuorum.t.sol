@@ -22,8 +22,7 @@ import "ds-token/delegate.sol";
 import "ds-thing/thing.sol";
 import {DSDelegateRoles} from "ds-roles/delegate_roles.sol";
 import {DSRoles} from "ds-roles/roles.sol";
-import "ds-pause/protest-pause.sol";
-
+import {DSPause} from "./mock/DSPauseMock.sol";
 import "../DelegateVoteQuorum.sol";
 
 abstract contract Hevm {
@@ -125,6 +124,8 @@ contract VoteQuorumUser is DSThing {
 
 }
 
+
+
 contract DelegateVoteQuorumTest is DSThing, DSTest {
     Hevm hevm;
 
@@ -143,7 +144,7 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
 
     DelegateVoteQuorum voteQuorum;
     DSDelegateToken prot;
-    DSProtestPause pause;
+    DSPause pause;
     Target govTarget;
     Target pauseTarget;
     GovActionsLike govActions;
@@ -163,7 +164,7 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
         govActions = new GovActionsLike();
 
         DSRoles roles = new DSRoles();
-        pause = new DSProtestPause(4 hours, delay, msg.sender, roles);
+        pause = new DSPause(delay, msg.sender, roles);
 
         pauseTarget = new Target();
         pauseTarget.addAuthorization(address(pause.proxy()));
@@ -439,7 +440,7 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
         assertTrue(canceled);
     }
 
-    function  test_owner_cancel() public {
+    function  test_guardian_cancel() public {
         uSmall.doDelegate(prot, address(uLarge));
         uMedium.doDelegate(prot, address(uMedium));
         uLarge3.doDelegate(prot, address(uLarge3));

@@ -10,6 +10,3 @@
 [submodule "lib/ds-roles"]
 	path = lib/ds-roles
 	url = https://github.com/reflexer-labs/ds-roles.git
-[submodule "lib/ds-pause"]
-	path = lib/ds-pause
-	url = https://github.com/reflexer-labs/ds-pause.git

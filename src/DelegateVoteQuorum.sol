@@ -1,5 +1,3 @@
-import 'ds-roles/roles.sol';
-
 // Copyright 2020 Compound Labs, Inc.
 //
 // Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
@@ -16,6 +14,7 @@ pragma solidity 0.6.7;
 pragma experimental ABIEncoderV2;
 
 import "ds-token/token.sol";
+import 'ds-roles/roles.sol';
 
 interface IDSDelegateToken {
     function totalSupply() external view returns (uint);
@@ -199,6 +198,10 @@ contract DelegateVoteQuorum {
     }
 
     // --- Admin ---
+    /**
+     * @notice Modifies an address parameter
+     * @param value Parameter new value
+     */
     function modifyParameters(bytes32 parameter, address value) external isAuthorized {
         if (parameter == "protocolToken") {
             require(address(protocolToken) == address(0), "DelegateVoteQuorum/protocol-token-already-set");
@@ -208,6 +211,10 @@ contract DelegateVoteQuorum {
         emit ModifyParameters(parameter, value);
     }
 
+    /**
+     * @notice Modifies an uint parameter
+     * @param wad Parameter new value
+     */
     function modifyParameters(bytes32 parameter, uint256 wad) external isAuthorized {
         if (parameter == "quorumVotes") {
             require(both(wad > 0, either(wad < protocolToken.totalSupply(), address(protocolToken) == address(0))), "DelegateVoteQuorum/invalid-quorum-votes");
@@ -264,10 +271,10 @@ contract DelegateVoteQuorum {
     /// @notice Create a proposal
     /// @param proposalType ProposalType
     /// @param proposalAddress Address of the proposal execution contract
-    /// @param proposalHash extcodehash of the proposal execution contract
-    /// @param data calldata for the call to the proposal contract
-    /// @param description description of the proposal
-    /// @return proposal Id
+    /// @param proposalHash Extcodehash of the proposal execution contract
+    /// @param data Calldata for the call to the proposal contract
+    /// @param description Description of the proposal
+    /// @return Proposal Id
     function propose(ProposalType proposalType, address proposalAddress, bytes32 proposalHash, bytes memory data, string memory description) public returns (uint) {
         require(protocolToken.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold, "DelegateVoteQuorum/proposer-votes-below-threshold");
         require(extcodehash(proposalAddress) == proposalHash, "DelegateVoteQuorum/code-hash-does-not-match-target");
@@ -341,7 +348,7 @@ contract DelegateVoteQuorum {
     /// @notice Get voter receipt for a given proposal
     /// @param proposalId Id of the proposal
     /// @param voter Address of the voter
-    /// @return receipt
+    /// @return Receipt
     function getReceipt(uint proposalId, address voter) public view returns (Receipt memory) {
         return proposals[proposalId].receipts[voter];
     }
@@ -372,14 +379,14 @@ contract DelegateVoteQuorum {
 
     /// @notice Casts a vote
     /// @param proposalId Id of the proposal
-    /// @param support true for a pro proposal vote, false for a con vote
+    /// @param support True for a pro proposal vote, false for a con vote
     function castVote(uint proposalId, bool support) public {
         return _castVote(msg.sender, proposalId, support);
     }
 
     /// @notice Casts a meta vote (signed offline, params v, r and s)
     /// @param proposalId Id of the proposal
-    /// @param support true for a pro proposal vote, false for a con vote
+    /// @param support True for a pro proposal vote, false for a con vote
     function castVoteBySig(uint proposalId, bool support, uint8 v, bytes32 r, bytes32 s) public {
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
@@ -392,7 +399,7 @@ contract DelegateVoteQuorum {
     /// @notice Casts a vote (internal)
     /// @param voter Address of voter
     /// @param proposalId Id of the proposal
-    /// @param support true for a pro proposal vote, false for a con vote
+    /// @param support True for a pro proposal vote, false for a con vote
     function _castVote(address voter, uint proposalId, bool support) internal {
         require(state(proposalId) == ProposalState.Active, "DelegateVoteQuorum/voting-is-closed");
         Proposal storage proposal = proposals[proposalId];
@@ -422,8 +429,8 @@ contract DelegateVoteQuorum {
 
     /// @notice Transfers root access from this contract to another one (onlyGuardian)
     /// @param account Account to become root in dspause.authority()
-    /// @return revokeProposal address of the proposal to revoke access from this contract
-    /// @return grantProposal address of the proposal to grant root access to address account
+    /// @return revokeProposal Address of the proposal to revoke access from this contract
+    /// @return grantProposal Address of the proposal to grant root access to address account
     function transferRootAccess(address account) public returns (address revokeProposal, address grantProposal) {
         require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
         revokeProposal = _manageRootAccess(address(this), false);
@@ -432,7 +439,7 @@ contract DelegateVoteQuorum {
 
     /// @notice Grants root access to an account (onlyGuardian)
     /// @param account Account to become root in dspause.authority()
-    /// @return proposal address of the proposal
+    /// @return proposal Address of the proposal
     function manageRootAccess(address account, bool isRoot) public returns (address proposal) {
         require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
         proposal = _manageRootAccess(account, isRoot);
@@ -440,7 +447,7 @@ contract DelegateVoteQuorum {
 
     /// @notice Grants root access to an account (internal)
     /// @param account Account to become root in dspause.authority()
-    /// @return proposal address of the proposal
+    /// @return proposal Address of the proposal
     function _manageRootAccess(address account, bool isRoot) internal returns (address proposal) {
         proposal = address(new SetUserRootProposal());
         address usr = proposal;

@@ -66,6 +66,8 @@ contract DelegateVoteQuorum {
     IDSDelegateToken           public protocolToken;
     /// @notice The address of DSPause
     IDSPause                   public pause;
+    /// @notice Auhorized accounts
+    mapping (address => uint)  public authorizedAccounts;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
@@ -143,6 +145,10 @@ contract DelegateVoteQuorum {
     event ProposalCanceled(uint id);
     /// @notice An event emitted when a parameter has been modified
     event ModifyParameters(bytes32 parameter, uint256 wad);
+    event ModifyParameters(bytes32 parameter, address value);
+    /// @notice Events emitted when access is granted/removed
+    event AddAuthorization(address account);
+    event RemoveAuthorization(address account);
 
     constructor(
       string memory name_,
@@ -150,32 +156,64 @@ contract DelegateVoteQuorum {
       uint256 proposalThreshold_,
       uint256 votingPeriod_,
       uint256 proposalLifetime_,
-      address protocolToken_,
       address pauseAddress,
       address guardianAddress
     ) public {
-        protocolToken         = IDSDelegateToken(protocolToken_);
-        require(both(quorumVotes_ > 0, quorumVotes_ < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-quorum-votes");
-        require(both(proposalThreshold_ > 0, proposalThreshold_ < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-proposal-threshold");
+        require(quorumVotes_ > 0, "DelegateVoteQuorum/invalid-quorum-votes");
+        require(proposalThreshold_ > 0, "DelegateVoteQuorum/invalid-proposal-threshold");
         require(votingPeriod_ > 0, "DelegateVoteQuorum/invalid-voting-period");
-        require(proposalLifetime_ > votingPeriod_, "DelegateVoteQuorum/invalid-proposal-lifetime");        
-        pause                 = IDSPause(pauseAddress);
-        name                  = name_;
-        quorumVotes           = quorumVotes_;
-        proposalLifetime      = proposalLifetime_;
-        proposalThreshold     = proposalThreshold_;
-        votingPeriod          = votingPeriod_;
-        guardian              = guardianAddress;
+        require(proposalLifetime_ > votingPeriod_, "DelegateVoteQuorum/invalid-proposal-lifetime");
+        authorizedAccounts[msg.sender] = 1;
+        pause                          = IDSPause(pauseAddress);
+        name                           = name_;
+        quorumVotes                    = quorumVotes_;
+        proposalLifetime               = proposalLifetime_;
+        proposalThreshold              = proposalThreshold_;
+        votingPeriod                   = votingPeriod_;
+        guardian                       = guardianAddress;
+    }
+
+    // --- Auth ---
+    /**
+     * @notice Add auth to an account
+     * @param account Account to add auth to
+     */
+    function addAuthorization(address account) external isAuthorized {
+        authorizedAccounts[account] = 1;
+        emit AddAuthorization(account);
+    }
+    /**
+     * @notice Remove auth from an account
+     * @param account Account to remove auth from
+     */
+    function removeAuthorization(address account) external isAuthorized {
+        authorizedAccounts[account] = 0;
+        emit RemoveAuthorization(account);
+    }
+    /**
+    * @notice Checks whether msg.sender can call an authed function
+    **/
+    modifier isAuthorized {
+        require(authorizedAccounts[msg.sender] == 1, "DelegateVoteQuorum/account-not-authorized");
+        _;
     }
 
     // --- Admin ---
-    function modifyParameters(bytes32 parameter, uint256 wad) external {
-        require(msg.sender == pause.proxy(), "esm/account-not-authorized");
+    function modifyParameters(bytes32 parameter, address value) external isAuthorized {
+        if (parameter == "protocolToken") {
+            require(address(protocolToken) == address(0), "DelegateVoteQuorum/protocol-token-already-set");
+            protocolToken = IDSDelegateToken(value);
+            require(both(quorumVotes < protocolToken.totalSupply(), proposalThreshold < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-total-supply");
+        } else revert("DelegateVoteQuorum/modify-unrecognized-param");
+        emit ModifyParameters(parameter, value);
+    }
+
+    function modifyParameters(bytes32 parameter, uint256 wad) external isAuthorized {
         if (parameter == "quorumVotes") {
-            require(both(wad > 0, wad < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-quorum-votes");
+            require(both(wad > 0, either(wad < protocolToken.totalSupply(), address(protocolToken) == address(0))), "DelegateVoteQuorum/invalid-quorum-votes");
             quorumVotes = wad;
         } else if (parameter == "proposalThreshold") {
-            require(both(wad > 0, wad < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-proposal-threshold");
+            require(both(wad > 0, either(wad < protocolToken.totalSupply(), address(protocolToken) == address(0))), "DelegateVoteQuorum/invalid-proposal-threshold");
             proposalThreshold = wad;
         } else if (parameter == "votingPeriod") {
             require(wad > 0, "DelegateVoteQuorum/invalid-voting-period");

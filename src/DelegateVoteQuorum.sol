@@ -1,5 +1,3 @@
-import 'ds-roles/roles.sol';
-
 // Copyright 2020 Compound Labs, Inc.
 //
 // Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
@@ -16,18 +14,19 @@ pragma solidity 0.6.7;
 pragma experimental ABIEncoderV2;
 
 import "ds-token/token.sol";
+import 'ds-roles/roles.sol';
 
-interface IDSDelegateToken {
+interface DSDelegateTokenLike {
     function totalSupply() external view returns (uint);
     function getPriorVotes(address account, uint blockNumber) external view returns (uint256);
 }
 
-interface IDSRoles {
+interface DSRolesLike {
     function setRootUser(address, bool) external;
     function isUserRoot(address) external view returns (bool);
 }
 
-interface IDSPause {
+interface DSPauseLike {
     function proxy() external view returns (address);
     function delay() external view returns (uint);
     function scheduleTransaction(address, bytes32, bytes calldata, uint) external;
@@ -36,7 +35,7 @@ interface IDSPause {
 }
 
 contract SetUserRootProposal {
-    function setRootUser(IDSRoles target, address account, bool isRoot) public {
+    function setRootUser(DSRolesLike target, address account, bool isRoot) public {
         target.setRootUser(account, isRoot);
     }
 }
@@ -63,9 +62,9 @@ contract DelegateVoteQuorum {
     /// @notice The latest proposal for each proposer
     mapping (address => uint)  public latestProposalIds;
     /// @notice The address of the protocol token
-    IDSDelegateToken           public protocolToken;
+    DSDelegateTokenLike        public protocolToken;
     /// @notice The address of DSPause
-    IDSPause                   public pause;
+    DSPauseLike                public pause;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
@@ -142,7 +141,7 @@ contract DelegateVoteQuorum {
     /// @notice An event emitted when a proposal has been canceled
     event ProposalCanceled(uint id);
     /// @notice An event emitted when a parameter has been modified
-    event ModifyParameters(bytes32 parameter, uint256 wad);
+    event ModifyParameters(bytes32 parameter, address value);
 
     constructor(
       string memory name_,
@@ -150,44 +149,41 @@ contract DelegateVoteQuorum {
       uint256 proposalThreshold_,
       uint256 votingPeriod_,
       uint256 proposalLifetime_,
-      address protocolToken_,
       address pauseAddress,
       address guardianAddress
     ) public {
-        protocolToken         = IDSDelegateToken(protocolToken_);
-        require(both(quorumVotes_ > 0, quorumVotes_ < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-quorum-votes");
-        require(both(proposalThreshold_ > 0, proposalThreshold_ < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-proposal-threshold");
+        require(quorumVotes_ > 0, "DelegateVoteQuorum/invalid-quorum-votes");
+        require(proposalThreshold_ > 0, "DelegateVoteQuorum/invalid-proposal-threshold");
         require(votingPeriod_ > 0, "DelegateVoteQuorum/invalid-voting-period");
-        require(proposalLifetime_ > votingPeriod_, "DelegateVoteQuorum/invalid-proposal-lifetime");        
-        pause                 = IDSPause(pauseAddress);
-        name                  = name_;
-        quorumVotes           = quorumVotes_;
-        proposalLifetime      = proposalLifetime_;
-        proposalThreshold     = proposalThreshold_;
-        votingPeriod          = votingPeriod_;
-        guardian              = guardianAddress;
+        require(proposalLifetime_ > votingPeriod_, "DelegateVoteQuorum/invalid-proposal-lifetime");
+        pause                          = DSPauseLike(pauseAddress);
+        name                           = name_;
+        quorumVotes                    = quorumVotes_;
+        proposalLifetime               = proposalLifetime_;
+        proposalThreshold              = proposalThreshold_;
+        votingPeriod                   = votingPeriod_;
+        guardian                       = guardianAddress;
+    }
+
+    // --- Auth ---
+    // @notice Reverts if msg.sender is not the guardian
+    modifier isGuardian {
+        require(msg.sender == guardian, "DelegateVoteQuorum/account-not-authorized");
+        _;
     }
 
     // --- Admin ---
-    function modifyParameters(bytes32 parameter, uint256 wad) external {
-        require(msg.sender == pause.proxy(), "esm/account-not-authorized");
-        if (parameter == "quorumVotes") {
-            require(both(wad > 0, wad < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-quorum-votes");
-            quorumVotes = wad;
-        } else if (parameter == "proposalThreshold") {
-            require(both(wad > 0, wad < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-proposal-threshold");
-            proposalThreshold = wad;
-        } else if (parameter == "votingPeriod") {
-            require(wad > 0, "DelegateVoteQuorum/invalid-voting-period");
-            votingPeriod = wad;
-        } else if (parameter == "proposalLifetime") {
-            require(wad > votingPeriod, "DelegateVoteQuorum/invalid-proposal-lifetime");
-            proposalLifetime = wad;
-        } else if (parameter == "votingDelay") {
-            require(wad > 1, "DelegateVoteQuorum/invalid-voting-delay");
-            votingDelay = wad;
+    /**
+     * @notice Modifies an address parameter
+     * @param value Parameter new value
+     */
+    function modifyParameters(bytes32 parameter, address value) external isGuardian {
+        if (parameter == "protocolToken") {
+            require(address(protocolToken) == address(0), "DelegateVoteQuorum/protocol-token-already-set");
+            protocolToken = DSDelegateTokenLike(value);
+            require(both(quorumVotes < protocolToken.totalSupply(), proposalThreshold < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-total-supply");
         } else revert("DelegateVoteQuorum/modify-unrecognized-param");
-        emit ModifyParameters(parameter, wad);
+        emit ModifyParameters(parameter, value);
     }
 
     // --- Util ---
@@ -226,10 +222,10 @@ contract DelegateVoteQuorum {
     /// @notice Create a proposal
     /// @param proposalType ProposalType
     /// @param proposalAddress Address of the proposal execution contract
-    /// @param proposalHash extcodehash of the proposal execution contract
-    /// @param data calldata for the call to the proposal contract
-    /// @param description description of the proposal
-    /// @return proposal Id
+    /// @param proposalHash Extcodehash of the proposal execution contract
+    /// @param data Calldata for the call to the proposal contract
+    /// @param description Description of the proposal
+    /// @return Proposal Id
     function propose(ProposalType proposalType, address proposalAddress, bytes32 proposalHash, bytes memory data, string memory description) public returns (uint) {
         require(protocolToken.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold, "DelegateVoteQuorum/proposer-votes-below-threshold");
         require(extcodehash(proposalAddress) == proposalHash, "DelegateVoteQuorum/code-hash-does-not-match-target");
@@ -281,6 +277,7 @@ contract DelegateVoteQuorum {
         } else if (proposal.proposalType == ProposalType.Abandon) {
             pause.abandonTransaction(proposal.usr, proposal.codeHash, proposal.data, block.timestamp + pause.delay());
         } else if (proposal.proposalType == ProposalType.Arbitrary) {
+            require(both(proposal.usr != address(pause.authority()), proposal.usr != address(pause)), "DelegateVoteQuorum/arbitrary-calls-to-pause-not-allowed");
             (bool success, ) = address(proposal.usr).call(proposal.data);
             require(success, "DelegateVoteQuorum/unsuccessful-call");
         }
@@ -303,7 +300,7 @@ contract DelegateVoteQuorum {
     /// @notice Get voter receipt for a given proposal
     /// @param proposalId Id of the proposal
     /// @param voter Address of the voter
-    /// @return receipt
+    /// @return Receipt
     function getReceipt(uint proposalId, address voter) public view returns (Receipt memory) {
         return proposals[proposalId].receipts[voter];
     }
@@ -334,14 +331,14 @@ contract DelegateVoteQuorum {
 
     /// @notice Casts a vote
     /// @param proposalId Id of the proposal
-    /// @param support true for a pro proposal vote, false for a con vote
+    /// @param support True for a pro proposal vote, false for a con vote
     function castVote(uint proposalId, bool support) public {
         return _castVote(msg.sender, proposalId, support);
     }
 
     /// @notice Casts a meta vote (signed offline, params v, r and s)
     /// @param proposalId Id of the proposal
-    /// @param support true for a pro proposal vote, false for a con vote
+    /// @param support True for a pro proposal vote, false for a con vote
     function castVoteBySig(uint proposalId, bool support, uint8 v, bytes32 r, bytes32 s) public {
         bytes32 domainSeparator = keccak256(abi.encode(DOMAIN_TYPEHASH, keccak256(bytes(name)), getChainId(), address(this)));
         bytes32 structHash = keccak256(abi.encode(BALLOT_TYPEHASH, proposalId, support));
@@ -354,7 +351,7 @@ contract DelegateVoteQuorum {
     /// @notice Casts a vote (internal)
     /// @param voter Address of voter
     /// @param proposalId Id of the proposal
-    /// @param support true for a pro proposal vote, false for a con vote
+    /// @param support True for a pro proposal vote, false for a con vote
     function _castVote(address voter, uint proposalId, bool support) internal {
         require(state(proposalId) == ProposalState.Active, "DelegateVoteQuorum/voting-is-closed");
         Proposal storage proposal = proposals[proposalId];
@@ -377,32 +374,29 @@ contract DelegateVoteQuorum {
 
     // Guardian Functions
     /// @notice Abdicates the guardian role (onlyGuardian)
-    function abdicate() public {
-        require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
+    function abdicate() public isGuardian {
         guardian = address(0);
     }
 
     /// @notice Transfers root access from this contract to another one (onlyGuardian)
     /// @param account Account to become root in dspause.authority()
-    /// @return revokeProposal address of the proposal to revoke access from this contract
-    /// @return grantProposal address of the proposal to grant root access to address account
-    function transferRootAccess(address account) public returns (address revokeProposal, address grantProposal) {
-        require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
+    /// @return revokeProposal Address of the proposal to revoke access from this contract
+    /// @return grantProposal Address of the proposal to grant root access to address account
+    function transferRootAccess(address account) public isGuardian returns (address revokeProposal, address grantProposal) {
         revokeProposal = _manageRootAccess(address(this), false);
         grantProposal  = _manageRootAccess(account, true);
     }
 
     /// @notice Grants root access to an account (onlyGuardian)
     /// @param account Account to become root in dspause.authority()
-    /// @return proposal address of the proposal
-    function manageRootAccess(address account, bool isRoot) public returns (address proposal) {
-        require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
+    /// @return proposal Address of the proposal
+    function manageRootAccess(address account, bool isRoot) public isGuardian returns (address proposal) {
         proposal = _manageRootAccess(account, isRoot);
     }
 
     /// @notice Grants root access to an account (internal)
     /// @param account Account to become root in dspause.authority()
-    /// @return proposal address of the proposal
+    /// @return proposal Address of the proposal
     function _manageRootAccess(address account, bool isRoot) internal returns (address proposal) {
         proposal = address(new SetUserRootProposal());
         address usr = proposal;

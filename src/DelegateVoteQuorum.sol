@@ -16,17 +16,17 @@ pragma experimental ABIEncoderV2;
 import "ds-token/token.sol";
 import 'ds-roles/roles.sol';
 
-interface IDSDelegateToken {
+interface DSDelegateTokenLike {
     function totalSupply() external view returns (uint);
     function getPriorVotes(address account, uint blockNumber) external view returns (uint256);
 }
 
-interface IDSRoles {
+interface DSRolesLike {
     function setRootUser(address, bool) external;
     function isUserRoot(address) external view returns (bool);
 }
 
-interface IDSPause {
+interface DSPauseLike {
     function proxy() external view returns (address);
     function delay() external view returns (uint);
     function scheduleTransaction(address, bytes32, bytes calldata, uint) external;
@@ -35,7 +35,7 @@ interface IDSPause {
 }
 
 contract SetUserRootProposal {
-    function setRootUser(IDSRoles target, address account, bool isRoot) public {
+    function setRootUser(DSRolesLike target, address account, bool isRoot) public {
         target.setRootUser(account, isRoot);
     }
 }
@@ -62,11 +62,9 @@ contract DelegateVoteQuorum {
     /// @notice The latest proposal for each proposer
     mapping (address => uint)  public latestProposalIds;
     /// @notice The address of the protocol token
-    IDSDelegateToken           public protocolToken;
+    DSDelegateTokenLike        public protocolToken;
     /// @notice The address of DSPause
-    IDSPause                   public pause;
-    /// @notice Auhorized accounts
-    mapping (address => uint)  public authorizedAccounts;
+    DSPauseLike                public pause;
 
     struct Proposal {
         /// @notice Unique id for looking up a proposal
@@ -143,11 +141,7 @@ contract DelegateVoteQuorum {
     /// @notice An event emitted when a proposal has been canceled
     event ProposalCanceled(uint id);
     /// @notice An event emitted when a parameter has been modified
-    event ModifyParameters(bytes32 parameter, uint256 wad);
     event ModifyParameters(bytes32 parameter, address value);
-    /// @notice Events emitted when access is granted/removed
-    event AddAuthorization(address account);
-    event RemoveAuthorization(address account);
 
     constructor(
       string memory name_,
@@ -162,8 +156,7 @@ contract DelegateVoteQuorum {
         require(proposalThreshold_ > 0, "DelegateVoteQuorum/invalid-proposal-threshold");
         require(votingPeriod_ > 0, "DelegateVoteQuorum/invalid-voting-period");
         require(proposalLifetime_ > votingPeriod_, "DelegateVoteQuorum/invalid-proposal-lifetime");
-        authorizedAccounts[msg.sender] = 1;
-        pause                          = IDSPause(pauseAddress);
+        pause                          = DSPauseLike(pauseAddress);
         name                           = name_;
         quorumVotes                    = quorumVotes_;
         proposalLifetime               = proposalLifetime_;
@@ -173,27 +166,9 @@ contract DelegateVoteQuorum {
     }
 
     // --- Auth ---
-    /**
-     * @notice Add auth to an account
-     * @param account Account to add auth to
-     */
-    function addAuthorization(address account) external isAuthorized {
-        authorizedAccounts[account] = 1;
-        emit AddAuthorization(account);
-    }
-    /**
-     * @notice Remove auth from an account
-     * @param account Account to remove auth from
-     */
-    function removeAuthorization(address account) external isAuthorized {
-        authorizedAccounts[account] = 0;
-        emit RemoveAuthorization(account);
-    }
-    /**
-    * @notice Checks whether msg.sender can call an authed function
-    **/
-    modifier isAuthorized {
-        require(authorizedAccounts[msg.sender] == 1, "DelegateVoteQuorum/account-not-authorized");
+    // @notice Reverts if msg.sender is not the guardian
+    modifier isGuardian {
+        require(msg.sender == guardian, "DelegateVoteQuorum/account-not-authorized");
         _;
     }
 
@@ -202,37 +177,13 @@ contract DelegateVoteQuorum {
      * @notice Modifies an address parameter
      * @param value Parameter new value
      */
-    function modifyParameters(bytes32 parameter, address value) external isAuthorized {
+    function modifyParameters(bytes32 parameter, address value) external isGuardian {
         if (parameter == "protocolToken") {
             require(address(protocolToken) == address(0), "DelegateVoteQuorum/protocol-token-already-set");
-            protocolToken = IDSDelegateToken(value);
+            protocolToken = DSDelegateTokenLike(value);
             require(both(quorumVotes < protocolToken.totalSupply(), proposalThreshold < protocolToken.totalSupply()), "DelegateVoteQuorum/invalid-total-supply");
         } else revert("DelegateVoteQuorum/modify-unrecognized-param");
         emit ModifyParameters(parameter, value);
-    }
-
-    /**
-     * @notice Modifies an uint parameter
-     * @param wad Parameter new value
-     */
-    function modifyParameters(bytes32 parameter, uint256 wad) external isAuthorized {
-        if (parameter == "quorumVotes") {
-            require(both(wad > 0, either(wad < protocolToken.totalSupply(), address(protocolToken) == address(0))), "DelegateVoteQuorum/invalid-quorum-votes");
-            quorumVotes = wad;
-        } else if (parameter == "proposalThreshold") {
-            require(both(wad > 0, either(wad < protocolToken.totalSupply(), address(protocolToken) == address(0))), "DelegateVoteQuorum/invalid-proposal-threshold");
-            proposalThreshold = wad;
-        } else if (parameter == "votingPeriod") {
-            require(wad > 0, "DelegateVoteQuorum/invalid-voting-period");
-            votingPeriod = wad;
-        } else if (parameter == "proposalLifetime") {
-            require(wad > votingPeriod, "DelegateVoteQuorum/invalid-proposal-lifetime");
-            proposalLifetime = wad;
-        } else if (parameter == "votingDelay") {
-            require(wad > 1, "DelegateVoteQuorum/invalid-voting-delay");
-            votingDelay = wad;
-        } else revert("DelegateVoteQuorum/modify-unrecognized-param");
-        emit ModifyParameters(parameter, wad);
     }
 
     // --- Util ---
@@ -326,6 +277,7 @@ contract DelegateVoteQuorum {
         } else if (proposal.proposalType == ProposalType.Abandon) {
             pause.abandonTransaction(proposal.usr, proposal.codeHash, proposal.data, block.timestamp + pause.delay());
         } else if (proposal.proposalType == ProposalType.Arbitrary) {
+            require(both(proposal.usr != address(pause.authority()), proposal.usr != address(pause)), "DelegateVoteQuorum/arbitrary-calls-to-pause-not-allowed");
             (bool success, ) = address(proposal.usr).call(proposal.data);
             require(success, "DelegateVoteQuorum/unsuccessful-call");
         }
@@ -422,8 +374,7 @@ contract DelegateVoteQuorum {
 
     // Guardian Functions
     /// @notice Abdicates the guardian role (onlyGuardian)
-    function abdicate() public {
-        require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
+    function abdicate() public isGuardian {
         guardian = address(0);
     }
 
@@ -431,8 +382,7 @@ contract DelegateVoteQuorum {
     /// @param account Account to become root in dspause.authority()
     /// @return revokeProposal Address of the proposal to revoke access from this contract
     /// @return grantProposal Address of the proposal to grant root access to address account
-    function transferRootAccess(address account) public returns (address revokeProposal, address grantProposal) {
-        require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
+    function transferRootAccess(address account) public isGuardian returns (address revokeProposal, address grantProposal) {
         revokeProposal = _manageRootAccess(address(this), false);
         grantProposal  = _manageRootAccess(account, true);
     }
@@ -440,8 +390,7 @@ contract DelegateVoteQuorum {
     /// @notice Grants root access to an account (onlyGuardian)
     /// @param account Account to become root in dspause.authority()
     /// @return proposal Address of the proposal
-    function manageRootAccess(address account, bool isRoot) public returns (address proposal) {
-        require(msg.sender == guardian, "DelegateVoteQuorum/sender-must-be-gov-guardian");
+    function manageRootAccess(address account, bool isRoot) public isGuardian returns (address proposal) {
         proposal = _manageRootAccess(account, isRoot);
     }
 

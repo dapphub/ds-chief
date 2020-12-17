@@ -53,10 +53,6 @@ contract SimpleAction {
 }
 
 contract GovActionsLike {
-    function modifyParameters(DelegateVoteQuorum target, bytes32 parameter, uint value) public {
-        target.modifyParameters(parameter, value);
-    }
-
     function modifyParameters(DelegateVoteQuorum target, bytes32 parameter, address value) public {
         target.modifyParameters(parameter, value);
     }
@@ -119,10 +115,7 @@ contract VoteQuorumUser is DSThing {
     function doExecute(uint proposalId) public {
         return voteQuorum.execute(proposalId);
     }
-
 }
-
-
 
 contract DelegateVoteQuorumTest is DSThing, DSTest {
     Hevm hevm;
@@ -182,12 +175,7 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
         );
 
         voteQuorum.modifyParameters("protocolToken", address(prot));
-        voteQuorum.addAuthorization(address(pause.proxy()));
-        voteQuorum.removeAuthorization(address(this));
-
         assertEq(address(voteQuorum.protocolToken()), address(prot));
-        assertEq(voteQuorum.authorizedAccounts(address(this)), 0);
-        assertEq(voteQuorum.authorizedAccounts(address(pause.proxy())), 1);
 
         govTarget = new Target();
         govTarget.addAuthorization(address(voteQuorum));
@@ -312,6 +300,40 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
         hevm.roll(block.number + 1);
         uMedium.doExecute(proposalId);
         assertEq(govTarget.val(), 20);
+    }
+
+    function  testFail_execute_arbitrary_proposal_to_pause() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge3));
+        uLarge3.doDelegate(prot, address(uLarge3));
+        uLarge2.doDelegate(prot, address(uLarge3));
+        
+        hevm.roll(block.number + 1);
+        uint proposalId = uLarge.doPropose(DelegateVoteQuorum.ProposalType.Arbitrary, address(pause), voteQuorum.extcodehash(address(pause)), "", "description");
+        
+        hevm.roll(block.number + voteQuorum.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+        uLarge3.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uMedium.doExecute(proposalId);
+    }
+
+    function  testFail_execute_arbitrary_proposal_to_authority() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge3));
+        uLarge3.doDelegate(prot, address(uLarge3));
+        uLarge2.doDelegate(prot, address(uLarge3));
+        
+        hevm.roll(block.number + 1);
+        uint proposalId = uLarge.doPropose(DelegateVoteQuorum.ProposalType.Arbitrary, address(pause.authority()), voteQuorum.extcodehash(address(pause.authority())), "", "description");
+        
+        hevm.roll(block.number + voteQuorum.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+        uLarge3.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uMedium.doExecute(proposalId);
     }
 
     function  test_execute_schedule_proposal() public {
@@ -516,40 +538,6 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
         uLarge.doCancel(proposalId);
     }
 
-    function _modifyParameter(bytes32 parameter, uint val) internal {
-        uSmall.doDelegate(prot, address(uLarge));
-        uMedium.doDelegate(prot, address(uLarge));
-        uLarge3.doDelegate(prot, address(uLarge));
-        uLarge2.doDelegate(prot, address(uLarge));
-        
-        hevm.roll(block.number + 1);
-        address usr = address(govActions);
-        bytes memory data = abi.encodeWithSignature("modifyParameters(address,bytes32,uint256)", voteQuorum, parameter, val);
-        uint proposalId = uLarge.doPropose(DelegateVoteQuorum.ProposalType.Schedule, usr, voteQuorum.extcodehash(usr), data, "modifyParams");
-        
-        hevm.roll(block.number + voteQuorum.votingDelay() + voteQuorum.votingPeriod()); // very last block
-        uLarge.doCastVote(proposalId, true);
-
-        hevm.roll(block.number + 1);
-        uMedium.doExecute(proposalId); // scheduled the proposal
-
-        hevm.warp(now + pause.delay()); 
-        pause.executeTransaction(usr, voteQuorum.extcodehash(usr), data, block.timestamp);
-    }
-
-    function  test_modify_parameters() public {
-        _modifyParameter(bytes32("quorumVotes"), quorum + 1);
-        assertEq(voteQuorum.quorumVotes(), quorum + 1);
-        _modifyParameter(bytes32("proposalThreshold"), proposalThreshold + 1);
-        assertEq(voteQuorum.proposalThreshold(), proposalThreshold + 1);
-        _modifyParameter(bytes32("proposalLifetime"), proposalLifetime + 1);
-        assertEq(voteQuorum.proposalLifetime(), proposalLifetime + 1);
-        _modifyParameter(bytes32("votingDelay"), 2);
-        assertEq(voteQuorum.votingDelay(), 2);
-        _modifyParameter(bytes32("votingPeriod"), votingPeriod + 1);
-        assertEq(voteQuorum.votingPeriod(), votingPeriod + 1);
-    }
-
     function  testFail_modify_invalid_parameter() public {
         uSmall.doDelegate(prot, address(uLarge));
         uMedium.doDelegate(prot, address(uLarge));
@@ -609,7 +597,7 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
         hevm.warp(now + pause.delay());
         
         pause.executeTransaction(usr, voteQuorum.extcodehash(usr), data, block.timestamp);
-        assertTrue(IDSRoles(address(pause.authority())).isUserRoot(address(0xabc)));
+        assertTrue(DSRolesLike(address(pause.authority())).isUserRoot(address(0xabc)));
     }
 
     function test_transferRootAccess() public {
@@ -623,13 +611,8 @@ contract DelegateVoteQuorumTest is DSThing, DSTest {
         
         pause.executeTransaction(revokeProposal, voteQuorum.extcodehash(revokeProposal), revokeData, block.timestamp);
         pause.executeTransaction(grantProposal, voteQuorum.extcodehash(grantProposal), grantData, block.timestamp);
-        assertTrue(IDSRoles(address(pause.authority())).isUserRoot(address(0xabc)));
-        assertTrue(!IDSRoles(address(pause.authority())).isUserRoot(address(voteQuorum)));
-    }
-
-    function testFail_isAuthorized_modifier() public {
-        
-        voteQuorum.addAuthorization(address(0xabc));
+        assertTrue(DSRolesLike(address(pause.authority())).isUserRoot(address(0xabc)));
+        assertTrue(!DSRolesLike(address(pause.authority())).isUserRoot(address(voteQuorum)));
     }
 
 }

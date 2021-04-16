@@ -21,7 +21,6 @@ pragma experimental ABIEncoderV2;
 import "ds-test/test.sol";
 import "ds-token/delegate.sol";
 import "ds-thing/thing.sol";
-import {DSDelegateRoles} from "ds-roles/delegate_roles.sol";
 import {DSRoles} from "ds-roles/roles.sol";
 import {DSPause} from "./mock/DSPauseMock.sol";
 import "../GovernorBravo.sol";
@@ -116,27 +115,46 @@ contract VoteQuorumUser is DSThing {
     }
 }
 
+contract GovernorProxyActions {
+    function setVotingDelay(address governor, uint votingDelay) public {
+        GovernorBravo(governor)._setVotingDelay(votingDelay);
+    }
+
+    function setVotingPeriod(address governor, uint votingPeriod) public {
+        GovernorBravo(governor)._setVotingPeriod(votingPeriod);
+    }
+
+    function setProposalThreshold(address governor, uint proposalThreshold) public {
+        GovernorBravo(governor)._setProposalThreshold(proposalThreshold);
+    }
+
+    function setPendingAdmin(address governor, address who) public {
+        GovernorBravo(governor)._setPendingAdmin(who);
+    }
+}
+
 contract GovernorBravoTest is DSThing, DSTest {
     Hevm hevm;
 
     uint256 constant quorum = 10000 ether;
     uint256 constant proposalThreshold = 50000 ether;
     uint256 constant votingPeriod = 5760;
-    uint256 constant proposalLifetime = 10000;
+    uint256 constant votingDelay = 10000;
 
     // pause
     uint256 delay = 1 days;
 
     uint256 constant initialBalance = 1000000 ether;
-    uint256 constant uLargeInitialBalance = 35000 ether;
-    uint256 constant uMediumInitialBalance = 25000 ether;
-    uint256 constant uSmallInitialBalance = 15000 ether;
+    uint256 constant uLargeInitialBalance = 35000 ether + 1;
+    uint256 constant uMediumInitialBalance = 25000 ether + 1;
+    uint256 constant uSmallInitialBalance = 15000 ether + 1;
 
     GovernorBravo governor;
     DSDelegateToken prot;
     DSPause pause;
     Target govTarget;
     Target pauseTarget;
+    GovernorProxyActions proxyActions;
 
     // u prefix: user
     VoteQuorumUser uWhale;
@@ -167,7 +185,7 @@ contract GovernorBravoTest is DSThing, DSTest {
             address(pause),
             address(prot),
             votingPeriod,
-            proposalLifetime,
+            votingDelay,
             proposalThreshold
         );
 
@@ -195,15 +213,98 @@ contract GovernorBravoTest is DSThing, DSTest {
         prot.transfer(address(uMedium), uMediumInitialBalance);
         prot.transfer(address(uSmall), uSmallInitialBalance);
 
+        proxyActions = new GovernorProxyActions();
+
         hevm.roll(20);
     }
 
-    function test_initialization2() public {
-        assert(address(governor.comp()) == address(prot));
+    function test_initialization() public {
+        assert(address(governor.flx()) == address(prot));
         assert(address(governor.timelock()) == address(pause));
         assert(governor.proposalThreshold() == proposalThreshold);
         assert(governor.votingPeriod() == votingPeriod);
-        assert(governor.votingDelay() == proposalLifetime);
+        assert(governor.votingDelay() == votingDelay);
+        assert(governor.admin() == address(pause.proxy()));
+    }
+
+    function testFail_deploy_null_pause() public {
+        governor = new GovernorBravo(
+            address(0),
+            address(prot),
+            votingPeriod,
+            votingDelay,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_null_prot() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(0),
+            votingPeriod,
+            votingDelay,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_invalid_voting_period() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            governor.MIN_VOTING_PERIOD() - 1,
+            votingDelay,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_invalid_voting_period2() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            governor.MAX_VOTING_PERIOD() + 1,
+            votingDelay,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_invalid_voting_delay() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            votingPeriod,
+            governor.MIN_VOTING_DELAY() - 1,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_invalid_voting_delay2() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            votingPeriod,
+            governor.MAX_VOTING_DELAY() + 1,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_invalid_threshold() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            votingPeriod,
+            votingDelay,
+            governor.MIN_PROPOSAL_THRESHOLD() - 1
+        );
+    }
+
+    function testFail_deploy_invalid_threshold2() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            votingPeriod,
+            votingDelay,
+            governor.MAX_PROPOSAL_THRESHOLD() + 1
+        );
     }
 
     function testFail_propose_not_enough_votes() public {
@@ -240,8 +341,8 @@ contract GovernorBravoTest is DSThing, DSTest {
             assertEq(id, proposalId);
             assertEq(proposer, address(uLarge));
             assertEq(eta, 0);
-            assertEq(startBlock, block.number + proposalLifetime);
-            assertEq(endBlock, block.number + proposalLifetime + votingPeriod);
+            assertEq(startBlock, block.number + votingDelay);
+            assertEq(endBlock, block.number + votingDelay + votingPeriod);
             assertEq(forVotes, 0);
             assertEq(againstVotes, 0);
             assertEq(abstainVotes, 0);
@@ -396,5 +497,321 @@ contract GovernorBravoTest is DSThing, DSTest {
 
         (,,,,,,,, bool canceled,) = governor.proposals(proposalId);
         assertTrue(canceled);
+    }
+
+    function  testFail_cancel_already_executed() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(new SimpleAction()));
+        calldatas.push(abi.encodeWithSelector(SimpleAction.set.selector, pauseTarget, 30));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+        uLarge.doCancel(proposalId);
+    }
+
+    function  testFail_cancel_unauthorized() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uLarge.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uMedium));
+
+        hevm.roll(block.number + 1);
+        targets.push(address(new SimpleAction()));
+        calldatas.push(abi.encodeWithSelector(SimpleAction.set.selector, pauseTarget, 30));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uMedium.doCastVote(proposalId, true);
+        uLarge.doCastVote(proposalId, true);
+        uLarge2.doCastVote(proposalId, true);
+        uLarge3.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+        uMedium.doCancel(proposalId);
+    }
+
+    function test_get_actions() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uLarge.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uMedium));
+
+        hevm.roll(block.number + 1);
+        targets.push(address(new SimpleAction()));
+        calldatas.push(abi.encodeWithSelector(SimpleAction.set.selector, pauseTarget, 30));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        (address[] memory _targets,,,bytes[] memory _calldatas) = governor.getActions(proposalId);
+        assertEq(_targets[0], targets[0]);
+        assertEq(keccak256(_calldatas[0]), keccak256(calldatas[0]));
+    }
+
+    function test_set_voting_delay() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setVotingDelay.selector, address(governor), votingDelay + 50));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+
+        assertEq(governor.votingDelay(), votingDelay + 50);
+    }
+
+    function testFail_set_voting_delay_unauthorized() public {
+        governor._setVotingDelay(votingDelay + 1);
+    }
+
+    function testFail_set_voting_delay_invalid() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setVotingDelay.selector, address(governor), governor.MAX_VOTING_DELAY() + 1));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+    }
+
+    function testFail_set_voting_delay_invalid2() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setVotingDelay.selector, address(governor), governor.MIN_VOTING_DELAY() - 1));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+    }
+
+    function test_set_voting_period() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setVotingPeriod.selector, address(governor), votingPeriod + 50));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+
+        assertEq(governor.votingPeriod(), votingPeriod + 50);
+    }
+
+    function testFail_set_voting_period_unauthorized() public {
+        governor._setVotingPeriod(votingPeriod + 1);
+    }
+
+    function testFail_set_voting_period_invalid() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setVotingPeriod.selector, address(governor), governor.MAX_VOTING_PERIOD() + 1));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+    }
+
+    function testFail_set_voting_period_invalid2() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setVotingPeriod.selector, address(governor), governor.MIN_VOTING_PERIOD() - 1));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+    }
+
+////
+    function test_set_proposal_threshold() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setProposalThreshold.selector, address(governor), proposalThreshold + 50));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+
+        assertEq(governor.proposalThreshold(), proposalThreshold + 50);
+    }
+
+    function testFail_set_proposal_threshold_unauthorized() public {
+        governor._setProposalThreshold(proposalThreshold + 1);
+    }
+
+    function testFail_set_proposal_threshold_invalid() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setProposalThreshold.selector, address(governor), governor.MAX_PROPOSAL_THRESHOLD() + 1));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+    }
+
+    function testFail_set_proposal_threshold_invalid2() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setProposalThreshold.selector, address(governor), governor.MIN_PROPOSAL_THRESHOLD() - 1));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+    }
+
+    function test_transfer_admin() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(proxyActions));
+        calldatas.push(abi.encodeWithSelector(proxyActions.setPendingAdmin.selector, address(governor), address(this)));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        uLarge.doCastVote(proposalId, true);
+
+        hevm.roll(block.number + 1);
+        uSmall.doQueue(proposalId);
+
+        hevm.warp(now + pause.delay());
+        uMedium.doExecute(proposalId);
+
+        governor._acceptAdmin();
+        assertEq(governor.admin(), address(this));
+    }
+
+    function testFail_claim_ownership_unauthorized() public {
+        governor._acceptAdmin();
     }
 }

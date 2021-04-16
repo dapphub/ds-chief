@@ -80,9 +80,6 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
     /// @notice The number of votes required in order for a voter to become a proposer
     uint public proposalThreshold;
 
-    /// @notice Initial proposal id set at become
-    uint public initialProposalId;
-
     /// @notice The total number of proposals
     uint public proposalCount;
 
@@ -90,7 +87,7 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
     DSPauseLike public timelock;
 
     /// @notice The address of the Compound governance token
-    DSDelegateTokenLike public comp;
+    DSDelegateTokenLike public flx;
 
     /// @notice The official record of all proposals ever proposed
     mapping (uint => Proposal) public proposals;
@@ -174,13 +171,13 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
 contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
 
     /// @notice The name of this contract
-    string public constant name = "Compound Governor Bravo";
+    string public constant name = "Reflexer Governor";
 
     /// @notice The minimum setable proposal threshold
-    uint public constant MIN_PROPOSAL_THRESHOLD = 50000 ether; // 50,000 Comp
+    uint public constant MIN_PROPOSAL_THRESHOLD = 50000 ether; // 50,000 FLX
 
     /// @notice The maximum setable proposal threshold
-    uint public constant MAX_PROPOSAL_THRESHOLD = 100000e18; //100,000 Comp
+    uint public constant MAX_PROPOSAL_THRESHOLD = 100000 ether; //100,000 FLX
 
     /// @notice The minimum setable voting period
     uint public constant MIN_VOTING_PERIOD = 5760; // About 24 hours
@@ -209,24 +206,24 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
     /**
       * @notice Constructor
       * @param timelock_ The address of the Timelock
-      * @param comp_ The address of the COMP token
+      * @param flx_ The address of the COMP token
       * @param votingPeriod_ The initial voting period
       * @param votingDelay_ The initial voting delay
       * @param proposalThreshold_ The initial proposal threshold
       */
-    constructor(address timelock_, address comp_, uint votingPeriod_, uint votingDelay_, uint proposalThreshold_) public {
+    constructor(address timelock_, address flx_, uint votingPeriod_, uint votingDelay_, uint proposalThreshold_) public {
         require(timelock_ != address(0), "GovernorBravo::initialize: invalid timelock address");
-        require(comp_ != address(0), "GovernorBravo::initialize: invalid comp address");
+        require(flx_ != address(0), "GovernorBravo::initialize: invalid comp address");
         require(votingPeriod_ >= MIN_VOTING_PERIOD && votingPeriod_ <= MAX_VOTING_PERIOD, "GovernorBravo::initialize: invalid voting period");
         require(votingDelay_ >= MIN_VOTING_DELAY && votingDelay_ <= MAX_VOTING_DELAY, "GovernorBravo::initialize: invalid voting delay");
         require(proposalThreshold_ >= MIN_PROPOSAL_THRESHOLD && proposalThreshold_ <= MAX_PROPOSAL_THRESHOLD, "GovernorBravo::initialize: invalid proposal threshold");
 
         timelock = DSPauseLike(timelock_);
-        comp = DSDelegateTokenLike(comp_);
+        flx = DSDelegateTokenLike(flx_);
         votingPeriod = votingPeriod_;
         votingDelay = votingDelay_;
         proposalThreshold = proposalThreshold_;
-        admin = msg.sender;
+        admin = timelock.proxy();
     }
 
     /**
@@ -236,9 +233,9 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
       * @param description String description of the proposal
       * @return Proposal id of new proposal
       */
-    function propose(address[] memory targets, uint[] memory /* values */, string[] memory  /* signatures */, bytes[] memory calldatas, string memory description) public returns (uint) {
-        require(comp.getPriorVotes(msg.sender, sub256(block.number, 1)) >= proposalThreshold, "GovernorBravo::propose: proposer votes below proposal threshold");
-        require(targets.length == calldatas.length, "GovernorBravo::propose: proposal function information mismatch");
+    function propose(address[] memory targets, uint[] memory /* values */, string[] memory /* signatures */, bytes[] memory calldatas, string memory description) public returns (uint) {
+        require(flx.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold, "GovernorBravo::propose: proposer votes below proposal threshold");
+        require(targets.length == calldatas.length, "GovernorBravo::propose: proposal function information arity mismatch");
         require(targets.length != 0, "GovernorBravo::propose: must provide actions");
         require(targets.length <= proposalMaxOperations, "GovernorBravo::propose: too many actions");
 
@@ -251,18 +248,15 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
 
         uint startBlock = add256(block.number, votingDelay);
         uint endBlock = add256(startBlock, votingPeriod);
-        uint[] memory values;
-        string[] memory signatures;
 
         proposalCount++;
-
-        proposals[proposalCount] = Proposal({
+        Proposal memory newProposal = Proposal({
             id: proposalCount,
             proposer: msg.sender,
             eta: 0,
             targets: targets,
-            values: values,
-            signatures: signatures,
+            values: new uint[](0),
+            signatures: new string[](0),
             calldatas: calldatas,
             startBlock: startBlock,
             endBlock: endBlock,
@@ -272,10 +266,12 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
             canceled: false,
             executed: false
         });
-        latestProposalIds[msg.sender] = proposalCount;
 
-        emit ProposalCreated(proposalCount, msg.sender, targets, values, signatures, calldatas, startBlock, endBlock, description);
-        return proposalCount;
+        proposals[newProposal.id] = newProposal;
+        latestProposalIds[newProposal.proposer] = newProposal.id;
+
+        emit ProposalCreated(newProposal.id, msg.sender, targets, new uint[](0), new string[](0), calldatas, startBlock, endBlock, description);
+        return newProposal.id;
     }
 
     /**
@@ -316,6 +312,9 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
         emit ProposalExecuted(proposalId);
     }
 
+    event log(address);
+    event log(uint);
+
     /**
       * @notice Cancels a proposal only if sender is the proposer, or proposer delegates dropped below proposal threshold
       * @param proposalId The id of the proposal to cancel
@@ -324,7 +323,11 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
         require(state(proposalId) != ProposalState.Executed, "GovernorBravo::cancel: cannot cancel executed proposal");
 
         Proposal storage proposal = proposals[proposalId];
-        require(msg.sender == proposal.proposer || comp.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "GovernorBravo::cancel: proposer above threshold");
+        emit log(msg.sender);
+        emit log(proposal.proposer);
+        emit log(flx.getPriorVotes(proposal.proposer, sub256(block.number, 1)));
+        emit log(proposalThreshold);
+        require(msg.sender == proposal.proposer || flx.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "GovernorBravo::cancel: proposer above threshold");
         proposal.canceled = true;
 
         bytes32 codeHash;
@@ -364,7 +367,7 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
       * @return Proposal state
       */
     function state(uint proposalId) public returns (ProposalState) {
-        require(proposalCount >= proposalId && proposalId > initialProposalId, "GovernorBravo::state: invalid proposal id");
+        require(proposalCount >= proposalId, "GovernorBravo::state: invalid proposal id");
         Proposal storage proposal = proposals[proposalId];
         if (proposal.canceled) {
             return ProposalState.Canceled;
@@ -428,7 +431,7 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
         require(receipt.hasVoted == false, "GovernorBravo::castVoteInternal: voter already voted");
-        uint96 votes = uint96(comp.getPriorVotes(voter, proposal.startBlock));
+        uint96 votes = uint96(flx.getPriorVotes(voter, proposal.startBlock));
 
         if (support == 0) {
             proposal.againstVotes = add256(proposal.againstVotes, votes);

@@ -312,9 +312,6 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
         emit ProposalExecuted(proposalId);
     }
 
-    event log(address);
-    event log(uint);
-
     /**
       * @notice Cancels a proposal only if sender is the proposer, or proposer delegates dropped below proposal threshold
       * @param proposalId The id of the proposal to cancel
@@ -323,10 +320,6 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
         require(state(proposalId) != ProposalState.Executed, "GovernorBravo::cancel: cannot cancel executed proposal");
 
         Proposal storage proposal = proposals[proposalId];
-        emit log(msg.sender);
-        emit log(proposal.proposer);
-        emit log(flx.getPriorVotes(proposal.proposer, sub256(block.number, 1)));
-        emit log(proposalThreshold);
         require(msg.sender == proposal.proposer || flx.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "GovernorBravo::cancel: proposer above threshold");
         proposal.canceled = true;
 

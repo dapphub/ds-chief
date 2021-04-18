@@ -219,7 +219,7 @@ contract GovernorBravoTest is DSThing, DSTest {
     }
 
     function test_initialization() public {
-        assert(address(governor.flx()) == address(prot));
+        assert(address(governor.governanceToken()) == address(prot));
         assert(address(governor.timelock()) == address(pause));
         assert(governor.proposalThreshold() == proposalThreshold);
         assert(governor.votingPeriod() == votingPeriod);

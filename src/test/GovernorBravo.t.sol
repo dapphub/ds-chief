@@ -377,7 +377,7 @@ contract GovernorBravoTest is DSThing, DSTest {
         uLarge.doPropose(targets, calldatas);
     }
 
-    function  test_execute_schedule_proposal() public {
+    function test_execute_schedule_proposal() public {
         uSmall.doDelegate(prot, address(uLarge));
         uMedium.doDelegate(prot, address(uLarge));
         uLarge3.doDelegate(prot, address(uLarge));
@@ -402,7 +402,7 @@ contract GovernorBravoTest is DSThing, DSTest {
         assertEq(pauseTarget.val(), 30);
     }
 
-    function  testFail_queue_didnt_meet_quorum() public {
+    function testFail_queue_didnt_meet_quorum() public {
         uSmall.doDelegate(prot, address(uLarge));
         uLarge3.doDelegate(prot, address(uLarge3));
         uLarge2.doDelegate(prot, address(uLarge2));
@@ -423,7 +423,7 @@ contract GovernorBravoTest is DSThing, DSTest {
         uMedium.doExecute(proposalId);
     }
 
-    function  testFail_queue_more_con_votes() public {
+    function testFail_queue_more_con_votes() public {
         uWhale.doDelegate(prot, address(uWhale));
         uSmall.doDelegate(prot, address(uLarge));
         uLarge.doDelegate(prot, address(uLarge));
@@ -449,7 +449,7 @@ contract GovernorBravoTest is DSThing, DSTest {
         uMedium.doQueue(proposalId);
     }
 
-    function  testFail_queue_twice() public {
+    function testFail_queue_twice() public {
         uSmall.doDelegate(prot, address(uLarge));
         uLarge.doDelegate(prot, address(uLarge));
         uMedium.doDelegate(prot, address(uLarge));
@@ -471,7 +471,7 @@ contract GovernorBravoTest is DSThing, DSTest {
         uWhale.doQueue(proposalId);
     }
 
-    function  test_cancel() public {
+    function test_cancel() public {
         uSmall.doDelegate(prot, address(uLarge));
         uLarge.doDelegate(prot, address(uLarge));
         uMedium.doDelegate(prot, address(uMedium));
@@ -499,7 +499,7 @@ contract GovernorBravoTest is DSThing, DSTest {
         assertTrue(canceled);
     }
 
-    function  testFail_cancel_already_executed() public {
+    function testFail_cancel_already_executed() public {
         uSmall.doDelegate(prot, address(uLarge));
         uMedium.doDelegate(prot, address(uLarge));
 
@@ -521,7 +521,7 @@ contract GovernorBravoTest is DSThing, DSTest {
         uLarge.doCancel(proposalId);
     }
 
-    function  testFail_cancel_unauthorized() public {
+    function testFail_cancel_unauthorized() public {
         uSmall.doDelegate(prot, address(uLarge));
         uLarge.doDelegate(prot, address(uLarge));
         uMedium.doDelegate(prot, address(uMedium));

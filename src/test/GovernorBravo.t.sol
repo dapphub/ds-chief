@@ -20,10 +20,10 @@ pragma experimental ABIEncoderV2;
 
 import "ds-test/test.sol";
 import "ds-token/delegate.sol";
-import "ds-thing/thing.sol";
 import {DSRoles} from "ds-roles/roles.sol";
 import {DSPause} from "./mock/DSPauseMock.sol";
 import "../GovernorBravo.sol";
+import {DSThing} from 'ds-thing/thing.sol';
 
 abstract contract Hevm {
     function warp(uint) virtual public;

@@ -19,7 +19,7 @@ pragma solidity 0.6.7;
 
 import 'ds-token/token.sol';
 import 'ds-roles/roles.sol';
-import 'ds-thing/thing.sol';
+import {DSThing} from 'ds-thing/thing.sol';
 
 // The right way to use this contract is probably to mix it with some kind
 // of `DSAuthority`, like with `ds-roles`.

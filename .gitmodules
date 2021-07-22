@@ -4,3 +4,6 @@
 [submodule "lib/ds-token"]
 	path = lib/ds-token
 	url = https://github.com/reflexer-labs/ds-token.git
+[submodule "lib/ds-thing"]
+	path = lib/ds-thing
+	url = https://github.com/reflexer-labs/ds-thing.git

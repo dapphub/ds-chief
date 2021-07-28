@@ -13,6 +13,8 @@ interface DSPauseLike {
     function executeTransaction(address, bytes32, bytes calldata, uint) external;
     function abandonTransaction(address, bytes32, bytes calldata, uint) external;
     function authority() external view returns (address);
+    function getTransactionDataHash(address, bytes32, bytes calldata, uint) external pure returns (bytes32);
+    function scheduledTransactions(bytes32) external view returns (bool);
 }
 
 contract GovernorBravoEvents {
@@ -304,10 +306,13 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
 
         bytes32 codeHash;
         address usr;
+        bytes32 scheduledTransactionHash;
         for (uint i = 0; i < proposal.targets.length; i++) {
             usr = proposal.targets[i];
             assembly { codeHash := extcodehash(usr) }
-            timelock.executeTransaction(usr, codeHash, proposal.calldatas[i], proposal.eta);
+            scheduledTransactionHash = timelock.getTransactionDataHash(usr, codeHash, proposal.calldatas[i], proposal.eta);
+            if (timelock.scheduledTransactions(scheduledTransactionHash)) // will skip proposals already executed straight into pause
+                timelock.executeTransaction(usr, codeHash, proposal.calldatas[i], proposal.eta);
         }
         emit ProposalExecuted(proposalId);
     }

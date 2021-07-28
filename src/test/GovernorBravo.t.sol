@@ -389,15 +389,131 @@ contract GovernorBravoTest is DSThing, DSTest {
         calldatas.push(abi.encodeWithSelector(SimpleAction.set.selector, pauseTarget, 30));
 
         uint proposalId = uLarge.doPropose(targets, calldatas);
+        {
+            (
+                uint id,
+                address proposer,
+                uint eta,
+                uint startBlock,
+                uint endBlock,
+                uint forVotes,
+                uint againstVotes,
+                uint abstainVotes,
+                bool canceled,
+                bool executed
+            ) = governor.proposals(proposalId);
+
+            assertEq(id, proposalId);
+            assertEq(proposer, address(uLarge));
+            assertEq(eta, 0);
+            assertEq(startBlock, block.number + votingDelay);
+            assertEq(endBlock, block.number + votingDelay + votingPeriod);
+            assertEq(forVotes, 0);
+            assertEq(againstVotes, 0);
+            assertEq(abstainVotes, 0);
+            assertTrue(!canceled);
+            assertTrue(!executed);
+        }
 
         hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
-        uLarge.doCastVote(proposalId, true);
+        assertEq(uint256(governor.state(proposalId)), 1); // active
 
+        uLarge.doCastVote(proposalId, true);
         hevm.roll(block.number + 1);
+        assertEq(uint256(governor.state(proposalId)), 4); // succeeded
+
         uSmall.doQueue(proposalId);
+        assertEq(uint256(governor.state(proposalId)), 5); // queued
+
 
         hevm.warp(now + pause.delay());
         uMedium.doExecute(proposalId);
+        assertEq(uint256(governor.state(proposalId)), 7); // executed
+
+        {
+            (
+                ,,,,,,,,
+                bool canceled,
+                bool executed
+            ) = governor.proposals(proposalId);
+            assertTrue(!canceled);
+            assertTrue(executed);
+        }
+
+        assertEq(pauseTarget.val(), 30);
+    }
+
+    function test_execute_schedule_proposal_already_executed_in_pause() public {
+        uSmall.doDelegate(prot, address(uLarge));
+        uMedium.doDelegate(prot, address(uLarge));
+        uLarge3.doDelegate(prot, address(uLarge));
+        uLarge2.doDelegate(prot, address(uLarge));
+
+        hevm.roll(block.number + 1);
+
+        targets.push(address(new SimpleAction()));
+        calldatas.push(abi.encodeWithSelector(SimpleAction.set.selector, pauseTarget, 30));
+
+        uint proposalId = uLarge.doPropose(targets, calldatas);
+        {
+            (
+                uint id,
+                address proposer,
+                uint eta,
+                uint startBlock,
+                uint endBlock,
+                uint forVotes,
+                uint againstVotes,
+                uint abstainVotes,
+                bool canceled,
+                bool executed
+            ) = governor.proposals(proposalId);
+
+            assertEq(id, proposalId);
+            assertEq(proposer, address(uLarge));
+            assertEq(eta, 0);
+            assertEq(startBlock, block.number + votingDelay);
+            assertEq(endBlock, block.number + votingDelay + votingPeriod);
+            assertEq(forVotes, 0);
+            assertEq(againstVotes, 0);
+            assertEq(abstainVotes, 0);
+            assertTrue(!canceled);
+            assertTrue(!executed);
+        }
+
+        hevm.roll(block.number + governor.votingDelay() + votingPeriod); // very last block
+        assertEq(uint256(governor.state(proposalId)), 1); // active
+
+        uLarge.doCastVote(proposalId, true);
+        hevm.roll(block.number + 1);
+        assertEq(uint256(governor.state(proposalId)), 4); // succeeded
+
+        uSmall.doQueue(proposalId);
+        uint eta = now + pause.delay();
+        assertEq(uint256(governor.state(proposalId)), 5); // queued
+
+
+        hevm.warp(now + pause.delay());
+        address target = targets[0];
+
+        bytes32 codeHash;
+        assembly { codeHash := extcodehash(target) }
+
+        // executing directly in pause
+        pause.executeTransaction(targets[0], codeHash, calldatas[0], eta);
+
+        uMedium.doExecute(proposalId);
+        assertEq(uint256(governor.state(proposalId)), 7); // executed
+
+        {
+            (
+                ,,,,,,,,
+                bool canceled,
+                bool executed
+            ) = governor.proposals(proposalId);
+            assertTrue(!canceled);
+            assertTrue(executed);
+        }
 
         assertEq(pauseTarget.val(), 30);
     }
@@ -497,6 +613,7 @@ contract GovernorBravoTest is DSThing, DSTest {
 
         (,,,,,,,, bool canceled,) = governor.proposals(proposalId);
         assertTrue(canceled);
+        assertEq(uint256(governor.state(proposalId)), 2); // cancelled
     }
 
     function testFail_cancel_already_executed() public {

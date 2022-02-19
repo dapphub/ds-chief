@@ -151,17 +151,17 @@ contract DSChief is DSRoles, DSChiefApprovals {
              DSChiefApprovals (GOV, IOU, MAX_YAYS)
         public
     {
-        authority = this;
+        authority = this;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
         owner = address(0);
     }
 
     function setOwner(address owner_) public {
-        owner_;
+        owner_;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
         revert();
     }
 
     function setAuthority(DSAuthority authority_) public {
-        authority_;
+        authority_;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
         revert();
     }
 
@@ -179,8 +179,8 @@ contract DSChief is DSRoles, DSChiefApprovals {
 
 contract DSChiefFab {
     function newChief(DSToken gov, uint MAX_YAYS) public returns (DSChief chief) {
-        DSToken iou = new DSToken('IOU');
+        DSToken iou = new DSToken('IOU');0x7253C2D9f5BE25b7b3676880FD49c41B13070039
         chief = new DSChief(gov, iou, MAX_YAYS);
-        iou.setOwner(address(chief));
+        iou.setOwner(address(chief));0x7253C2D9f5BE25b7b3676880FD49c41B13070039
     }
 }

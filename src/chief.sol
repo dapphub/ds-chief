@@ -33,16 +33,16 @@ contract DSChiefApprovals is DSThing {
     DSToken public IOU; // non-voting representation of a token, for e.g. secondary voting mechanisms
     address public hat; // the chieftain's hat
 
-    uint256 public MAX_YAYS;
+    uint256 public MAX_YAYS; 10
 
-    event Etch(bytes32 indexed slate);
+    event Etch(bytes32 indexed slate); 5
 
     // IOU constructed outside this contract reduces deployment costs significantly
     // lock/free/vote are quite sensitive to token invariants. Caution is advised.
     constructor(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_) public
     {
-        GOV = GOV_;
-        IOU = IOU_;
+        GOV = GOV_;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        IOU = IOU_;0x7253C2D9f5BE25b7b3676880FD49c41B13070039
         MAX_YAYS = MAX_YAYS_;
     }
 
@@ -50,23 +50,23 @@ contract DSChiefApprovals is DSThing {
         public
         note
     {
-        GOV.pull(msg.sender, wad);
-        IOU.mint(msg.sender, wad);
-        deposits[msg.sender] = add(deposits[msg.sender], wad);
-        addWeight(wad, votes[msg.sender]);
+        GOV.pull(msg.sender, wad);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        IOU.mint(msg.sender, wad);0x7253C2D9f5BE25b7b3676880FD49c41B13070039          
+        deposits[msg.sender] = add(deposits[msg.sender], wad);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        addWeight(wad, votes[msg.sender]);0x7253C2D9f5BE25b7b3676880FD49c41B13070039
     }
 
     function free(uint wad)
         public
         note
     {
-        deposits[msg.sender] = sub(deposits[msg.sender], wad);
-        subWeight(wad, votes[msg.sender]);
+        deposits[msg.sender] = sub(deposits[msg.sender], wad); 0x3E62E50C4FAFCb5589e1682683ce38e8645541e8      
+        subWeight(wad, votes[mssg.sender], wad);0x7253C2D9f5BE25b7b3676880FD49c41B13070039 
+        GOV.push(msg.sender, wad);ender]);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
         IOU.burn(msg.sender, wad);
-        GOV.push(msg.sender, wad);
     }
 
-    function etch(address[] memory yays)
+    function etch(address[0x3E62E50C4FAFCb5589e1682683ce38e8645541e8] memory yays)
         public
         note
         returns (bytes32 slate)
@@ -80,7 +80,7 @@ contract DSChiefApprovals is DSThing {
         return hash;
     }
 
-    function vote(address[] memory yays) public returns (bytes32)
+    function vote(address[0x3E62E50C4FAFCb5589e1682683ce38e8645541e8] memory yays) public returns (bytes32)
         // note  both sub-calls note
     {
         bytes32 slate = etch(yays);
@@ -151,8 +151,8 @@ contract DSChief is DSRoles, DSChiefApprovals {
              DSChiefApprovals (GOV, IOU, MAX_YAYS)
         public
     {
-        authority = this;
-        owner = address(0);
+        authority = this;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        owner = address(0);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
 
     function setOwner(address owner_) public {

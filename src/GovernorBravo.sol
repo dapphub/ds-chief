@@ -364,7 +364,7 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
       * @param proposalId The id of the proposal
       * @return Proposal state
       */
-    function state(uint proposalId) public returns (ProposalState) {
+    function state(uint proposalId) public view returns (ProposalState) {
         require(proposalCount >= proposalId, "GovernorBravo::state: invalid proposal id");
         Proposal storage proposal = proposals[proposalId];
         if (proposal.canceled) {

@@ -52,6 +52,14 @@ contract SimpleAction {
     }
 }
 
+contract StakingMock {
+    uint public descendantPerAncestor = 1 ether;
+
+    function setDescendantPerAncestor(uint val) public {
+        descendantPerAncestor = val;
+    }
+}
+
 contract VoteQuorumUser is DSThing {
     GovernorBravo governor;
 
@@ -140,6 +148,7 @@ contract GovernorBravoTest is DSThing, DSTest {
     uint256 constant proposalThreshold = 50000 ether;
     uint256 constant votingPeriod = 5760;
     uint256 constant votingDelay = 10000;
+    uint256 constant boostMultiplier = 2 ether; // 2x
 
     // pause
     uint256 delay = 1 days;
@@ -151,6 +160,8 @@ contract GovernorBravoTest is DSThing, DSTest {
 
     GovernorBravo governor;
     DSDelegateToken prot;
+    DSDelegateToken boost;
+    StakingMock staking;
     DSPause pause;
     Target govTarget;
     Target pauseTarget;
@@ -181,9 +192,17 @@ contract GovernorBravoTest is DSThing, DSTest {
         prot = new DSDelegateToken("PROT", "PROT");
         prot.mint(initialBalance);
 
+        boost = new DSDelegateToken("BOOST", "BOOST");
+        boost.mint(initialBalance);
+
+        staking = new StakingMock();
+
         governor = new GovernorBravo(
             address(pause),
             address(prot),
+            address(boost),
+            address(staking),
+            boostMultiplier,
             votingPeriod,
             votingDelay,
             proposalThreshold
@@ -231,6 +250,9 @@ contract GovernorBravoTest is DSThing, DSTest {
         governor = new GovernorBravo(
             address(0),
             address(prot),
+            address(boost),
+            address(staking),
+            boostMultiplier,
             votingPeriod,
             votingDelay,
             proposalThreshold
@@ -241,6 +263,61 @@ contract GovernorBravoTest is DSThing, DSTest {
         governor = new GovernorBravo(
             address(pause),
             address(0),
+            address(boost),
+            address(staking),
+            boostMultiplier,
+            votingPeriod,
+            votingDelay,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_null_boost() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            address(0),
+            address(staking),
+            boostMultiplier,
+            votingPeriod,
+            votingDelay,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_null_staking() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            address(boost),
+            address(0),
+            boostMultiplier,
+            votingPeriod,
+            votingDelay,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_invalid_staking() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            address(boost),
+            address(0xabc),
+            boostMultiplier,
+            votingPeriod,
+            votingDelay,
+            proposalThreshold
+        );
+    }
+
+    function testFail_deploy_null_boost_multiplier() public {
+        governor = new GovernorBravo(
+            address(pause),
+            address(prot),
+            address(boost),
+            address(staking),
+            0,
             votingPeriod,
             votingDelay,
             proposalThreshold
@@ -251,6 +328,9 @@ contract GovernorBravoTest is DSThing, DSTest {
         governor = new GovernorBravo(
             address(pause),
             address(prot),
+            address(boost),
+            address(staking),
+            boostMultiplier,
             governor.MIN_VOTING_PERIOD() - 1,
             votingDelay,
             proposalThreshold
@@ -261,6 +341,9 @@ contract GovernorBravoTest is DSThing, DSTest {
         governor = new GovernorBravo(
             address(pause),
             address(prot),
+            address(boost),
+            address(staking),
+            boostMultiplier,
             governor.MAX_VOTING_PERIOD() + 1,
             votingDelay,
             proposalThreshold
@@ -271,6 +354,9 @@ contract GovernorBravoTest is DSThing, DSTest {
         governor = new GovernorBravo(
             address(pause),
             address(prot),
+            address(boost),
+            address(staking),
+            boostMultiplier,
             votingPeriod,
             governor.MIN_VOTING_DELAY() - 1,
             proposalThreshold
@@ -281,6 +367,9 @@ contract GovernorBravoTest is DSThing, DSTest {
         governor = new GovernorBravo(
             address(pause),
             address(prot),
+            address(boost),
+            address(staking),
+            boostMultiplier,
             votingPeriod,
             governor.MAX_VOTING_DELAY() + 1,
             proposalThreshold
@@ -291,6 +380,9 @@ contract GovernorBravoTest is DSThing, DSTest {
         governor = new GovernorBravo(
             address(pause),
             address(prot),
+            address(boost),
+            address(staking),
+            boostMultiplier,
             votingPeriod,
             votingDelay,
             governor.MIN_PROPOSAL_THRESHOLD() - 1
@@ -301,6 +393,9 @@ contract GovernorBravoTest is DSThing, DSTest {
         governor = new GovernorBravo(
             address(pause),
             address(prot),
+            address(boost),
+            address(staking),
+            boostMultiplier,
             votingPeriod,
             votingDelay,
             governor.MAX_PROPOSAL_THRESHOLD() + 1
@@ -826,7 +921,7 @@ contract GovernorBravoTest is DSThing, DSTest {
         uMedium.doExecute(proposalId);
     }
 
-////
+
     function test_set_proposal_threshold() public {
         uSmall.doDelegate(prot, address(uLarge));
         uMedium.doDelegate(prot, address(uLarge));
@@ -931,4 +1026,73 @@ contract GovernorBravoTest is DSThing, DSTest {
     function testFail_claim_ownership_unauthorized() public {
         governor._acceptAdmin();
     }
+
+    function test_boosted_voting_power() public {
+        assertEq(0, governor.getVotingPower(address(uSmall), block.number - 1));
+
+        // unboosted voting power
+        uSmall.doDelegate(prot, address(uSmall));
+        hevm.roll(block.number + 1);
+
+        assertEq(uSmallInitialBalance, governor.getVotingPower(address(uSmall), block.number - 1));
+
+        // boosted voting power
+        boost.mint(address(uSmall), uSmallInitialBalance);
+        uSmall.doDelegate(boost, address(uSmall));
+        hevm.roll(block.number + 1);
+
+        assertEq(uSmallInitialBalance + (boostMultiplier * uSmallInitialBalance / WAD), governor.getVotingPower(address(uSmall), block.number - 1));
+    }
+
+    function test_boosted_voting_power_after_slash() public {
+        assertEq(0, governor.getVotingPower(address(uMedium), block.number - 1));
+
+        // unboosted voting power
+        uMedium.doDelegate(prot, address(uMedium));
+        hevm.roll(block.number + 1);
+
+        assertEq(uMediumInitialBalance, governor.getVotingPower(address(uMedium), block.number - 1));
+
+        uint boostBalance = 669 ether;
+
+        // boosted voting power
+        boost.mint(address(uMedium), boostBalance);
+        uMedium.doDelegate(boost, address(uMedium));
+        hevm.roll(block.number + 1);
+
+        assertEq(uMediumInitialBalance + (boostMultiplier * boostBalance / WAD), governor.getVotingPower(address(uMedium), block.number - 1));
+
+        // staking slashed
+        staking.setDescendantPerAncestor(1.2 ether);
+        assertEq(uMediumInitialBalance + (boostMultiplier * boostBalance / 1.2 ether), governor.getVotingPower(address(uMedium), block.number - 1));
+    }
+
+    function test_boosted_voting_power_fuzz(uint protBalance, uint boostBalance, uint slashingAmount) public {
+        protBalance = protBalance % 1e9 ether; // up to 1 billion
+        boostBalance = boostBalance % 1e9 ether; // up to 1 billion
+        slashingAmount = 1 ether + (slashingAmount % 3 ether); // up to 75% slashing
+
+        VoteQuorumUser voter = new VoteQuorumUser(governor);
+        prot.mint(address(voter), protBalance);
+        boost.mint(address(voter), boostBalance);
+        voter.doDelegate(prot, address(voter));
+        voter.doDelegate(boost, address(voter));
+        hevm.roll(block.number + 1);
+        staking.setDescendantPerAncestor(slashingAmount);
+
+        assertEq(protBalance + (boostMultiplier * boostBalance / slashingAmount), governor.getVotingPower(address(voter), block.number - 1));
+    }
+
+    // takes too long for CI
+    // function prove_boosted_voting_power(uint protBalance, uint boostBalance, uint slashingAmount) public {
+    //     VoteQuorumUser voter = new VoteQuorumUser(governor);
+    //     prot.mint(address(voter), protBalance);
+    //     boost.mint(address(voter), boostBalance);
+    //     voter.doDelegate(prot, address(voter));
+    //     voter.doDelegate(boost, address(voter));
+    //     hevm.roll(block.number + 1);
+    //     staking.setDescendantPerAncestor(slashingAmount);
+
+    //     assertEq(protBalance + (boostMultiplier * boostBalance / slashingAmount), governor.getVotingPower(address(voter), block.number - 1));
+    // }
 }

@@ -10,4 +10,4 @@ before_install:
   - nix-env -f https://github.com/makerdao/makerpkgs/tarball/master -iA dappPkgsVersions.hevm-0_42_0.dapp
   - export SOLC_FLAGS="--optimize --optimize-runs 200"
 script:
-  - dapp --use solc:0.6.7 test
+  - dapp --use solc:0.6.7 test --fuzz-runs 5000

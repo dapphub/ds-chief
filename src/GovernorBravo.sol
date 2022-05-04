@@ -17,6 +17,10 @@ interface DSPauseLike {
     function scheduledTransactions(bytes32) external view returns (bool);
 }
 
+interface StakingLike {
+    function descendantPerAncestor() external view returns (uint);
+}
+
 contract GovernorBravoEvents {
     /// @notice An event emitted when a new proposal is created
     event ProposalCreated(uint id, address proposer, address[] targets, uint[] values, string[] signatures, bytes[] calldatas, uint startBlock, uint endBlock, string description);
@@ -90,6 +94,15 @@ contract GovernorBravoDelegateStorageV1 is GovernorBravoDelegatorStorage {
 
     /// @notice The address of the governance token
     DSDelegateTokenLike public governanceToken;
+
+    /// @notice The address of the boost token
+    DSDelegateTokenLike public boostToken;
+
+    /// @notice The address of the staking pool (get ratio between bost token and underlying tokens)
+    StakingLike public staking;
+
+    /// @notice The boost multiplier (WAD)
+    uint public boostMultiplier;
 
     /// @notice The official record of all proposals ever proposed
     mapping (uint => Proposal) public proposals;
@@ -209,19 +222,28 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
       * @notice Constructor
       * @param timelock_ The address of the tmelock
       * @param governanceToken_ The address of the (un)governance token
+      * @param boostToken_ The address of the boost token
+      * @param boostMultiplier_ The boost multiplier
       * @param votingPeriod_ The initial voting period
       * @param votingDelay_ The initial voting delay
       * @param proposalThreshold_ The initial proposal threshold
       */
-    constructor(address timelock_, address governanceToken_, uint votingPeriod_, uint votingDelay_, uint proposalThreshold_) public {
+    constructor(address timelock_, address governanceToken_, address boostToken_, address staking_, uint boostMultiplier_, uint votingPeriod_, uint votingDelay_, uint proposalThreshold_) public {
         require(timelock_ != address(0), "GovernorBravo::initialize: invalid timelock address");
         require(governanceToken_ != address(0), "GovernorBravo::initialize: invalid gov token address");
+        require(boostToken_ != address(0), "GovernorBravo::initialize: invalid boost token address");
+        require(staking_ != address(0), "GovernorBravo::initialize: invalid staking address");
+        require(boostMultiplier_ != 0, "GovernorBravo::initialize: invalid boost multiplier");
         require(votingPeriod_ >= MIN_VOTING_PERIOD && votingPeriod_ <= MAX_VOTING_PERIOD, "GovernorBravo::initialize: invalid voting period");
         require(votingDelay_ >= MIN_VOTING_DELAY && votingDelay_ <= MAX_VOTING_DELAY, "GovernorBravo::initialize: invalid voting delay");
         require(proposalThreshold_ >= MIN_PROPOSAL_THRESHOLD && proposalThreshold_ <= MAX_PROPOSAL_THRESHOLD, "GovernorBravo::initialize: invalid proposal threshold");
 
         timelock = DSPauseLike(timelock_);
         governanceToken = DSDelegateTokenLike(governanceToken_);
+        boostToken = DSDelegateTokenLike(boostToken_);
+        staking = StakingLike(staking_);
+        staking.descendantPerAncestor();
+        boostMultiplier = boostMultiplier_;
         votingPeriod = votingPeriod_;
         votingDelay = votingDelay_;
         proposalThreshold = proposalThreshold_;
@@ -236,7 +258,7 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
       * @return Proposal id of new proposal
       */
     function propose(address[] memory targets, uint[] memory /* values */, string[] memory /* signatures */, bytes[] memory calldatas, string memory description) public returns (uint) {
-        require(governanceToken.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold, "GovernorBravo::propose: proposer votes below proposal threshold");
+        require(getVotingPower(msg.sender, sub256(block.number, 1)) > proposalThreshold, "GovernorBravo::propose: proposer votes below proposal threshold");
         require(targets.length == calldatas.length, "GovernorBravo::propose: proposal function information arity mismatch");
         require(targets.length != 0, "GovernorBravo::propose: must provide actions");
         require(targets.length <= proposalMaxOperations, "GovernorBravo::propose: too many actions");
@@ -325,7 +347,7 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
         require(state(proposalId) != ProposalState.Executed, "GovernorBravo::cancel: cannot cancel executed proposal");
 
         Proposal storage proposal = proposals[proposalId];
-        require(msg.sender == proposal.proposer || governanceToken.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "GovernorBravo::cancel: proposer above threshold");
+        require(msg.sender == proposal.proposer || getVotingPower(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "GovernorBravo::cancel: proposer above threshold");
         proposal.canceled = true;
 
         bytes32 codeHash;
@@ -384,6 +406,24 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
         }
     }
 
+    event log(string, uint);
+    /**
+      * @notice Gets the voting power of a user in a given block
+      * @param voter Address of the voter
+      * @param blockNumber Block number
+      * @return votingPower Voting power at block number
+      */
+    function getVotingPower(address voter, uint blockNumber) public returns (uint votingPower) {
+        uint votes = governanceToken.getPriorVotes(voter, blockNumber);
+        uint boostVotes = boostToken.getPriorVotes(voter, blockNumber);
+
+        votingPower = add256(votes, mul256(boostVotes, boostMultiplier) / staking.descendantPerAncestor());
+
+        emit log("votes", votes);
+        emit log("boostVotes", boostVotes);
+        emit log("votingPower", votingPower);
+    }
+
     /**
       * @notice Cast a vote for a proposal
       * @param proposalId The id of the proposal to vote on
@@ -429,7 +469,7 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
         Proposal storage proposal = proposals[proposalId];
         Receipt storage receipt = proposal.receipts[voter];
         require(receipt.hasVoted == false, "GovernorBravo::castVoteInternal: voter already voted");
-        uint96 votes = uint96(governanceToken.getPriorVotes(voter, proposal.startBlock));
+        uint96 votes = uint96(getVotingPower(voter, proposal.startBlock));
 
         if (support == 0) {
             proposal.againstVotes = add256(proposal.againstVotes, votes);
@@ -536,6 +576,10 @@ contract GovernorBravo is GovernorBravoDelegateStorageV1, GovernorBravoEvents {
     function sub256(uint256 a, uint256 b) internal pure returns (uint) {
         require(b <= a, "subtraction underflow");
         return a - b;
+    }
+
+    function mul256(uint x, uint y) internal pure returns (uint z) {
+        require(y == 0 || (z = x * y) / y == x, "multiplication overflow");
     }
 
     function getChainIdInternal() internal pure returns (uint) {

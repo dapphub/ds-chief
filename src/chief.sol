@@ -17,9 +17,9 @@
 
 pragma solidity >=0.4.23;
 
-import 'ds-token/token.sol';
-import 'ds-roles/roles.sol';
-import 'ds-thing/thing.sol';
+import 'ds-token/token.sol';0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+import 'ds-roles/roles.sol';0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+import 'ds-thing/thing.sol';0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
 
 // The right way to use this contract is probably to mix it with some kind
 // of `DSAuthority`, like with `ds-roles`.
@@ -33,37 +33,37 @@ contract DSChiefApprovals is DSThing {
     DSToken public IOU; // non-voting representation of a token, for e.g. secondary voting mechanisms
     address public hat; // the chieftain's hat
 
-    uint256 public MAX_YAYS;
+    uint256 public MAX_YAYS;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
 
-    event Etch(bytes32 indexed slate);
+    event Etch(bytes32 indexed slate);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
 
     // IOU constructed outside this contract reduces deployment costs significantly
     // lock/free/vote are quite sensitive to token invariants. Caution is advised.
     constructor(DSToken GOV_, DSToken IOU_, uint MAX_YAYS_) public
     {
-        GOV = GOV_;
-        IOU = IOU_;
-        MAX_YAYS = MAX_YAYS_;
+        GOV = GOV_;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        IOU = IOU_;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        MAX_YAYS = MAX_YAYS_;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
 
     function lock(uint wad)
         public
         note
     {
-        GOV.pull(msg.sender, wad);
-        IOU.mint(msg.sender, wad);
-        deposits[msg.sender] = add(deposits[msg.sender], wad);
-        addWeight(wad, votes[msg.sender]);
+        GOV.pull(msg.sender, wad);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        IOU.mint(msg.sender, wad);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        deposits[msg.sender] = add(deposits[msg.sender], wad);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        addWeight(wad, votes[msg.sender]);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
 
     function free(uint wad)
         public
         note
     {
-        deposits[msg.sender] = sub(deposits[msg.sender], wad);
-        subWeight(wad, votes[msg.sender]);
-        IOU.burn(msg.sender, wad);
-        GOV.push(msg.sender, wad);
+        deposits[msg.sender] = sub(deposits[msg.sender], wad);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        subWeight(wad, votes[msg.sender]);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        IOU.burn(msg.sender, wad);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        GOV.push(msg.sender, wad);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
 
     function etch(address[] memory yays)
@@ -71,21 +71,21 @@ contract DSChiefApprovals is DSThing {
         note
         returns (bytes32 slate)
     {
-        require( yays.length <= MAX_YAYS );
-        requireByteOrderedSet(yays);
+        require( yays.length <= MAX_YAYS );0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        requireByteOrderedSet(yays);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
 
         bytes32 hash = keccak256(abi.encodePacked(yays));
-        slates[hash] = yays;
-        emit Etch(hash);
-        return hash;
+        slates[hash] = yays;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        emit Etch(hash);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        return hash;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
 
     function vote(address[] memory yays) public returns (bytes32)
         // note  both sub-calls note
     {
-        bytes32 slate = etch(yays);
-        vote(slate);
-        return slate;
+        bytes32 slate = etch(yays);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        vote(slate);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        return slate;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
 
     function vote(bytes32 slate)
@@ -93,11 +93,11 @@ contract DSChiefApprovals is DSThing {
         note
     {
         require(slates[slate].length > 0 ||
-            slate == 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470, "ds-chief-invalid-slate");
-        uint weight = deposits[msg.sender];
-        subWeight(weight, votes[msg.sender]);
-        votes[msg.sender] = slate;
-        addWeight(weight, votes[msg.sender]);
+            slate == 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470, "ds-chief-invalid-slate");0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        uint weight = deposits[msg.sender];0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        subWeight(weight, votes[msg.sender]);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        votes[msg.sender] = slate;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        addWeight(weight, votes[msg.sender]);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
 
     // like `drop`/`swap` except simply "elect this address if it is higher than current hat"
@@ -151,17 +151,17 @@ contract DSChief is DSRoles, DSChiefApprovals {
              DSChiefApprovals (GOV, IOU, MAX_YAYS)
         public
     {
-        authority = this;
-        owner = address(0);
+        authority = this;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        owner = address(0);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
 
     function setOwner(address owner_) public {
-        owner_;
+        owner_;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
         revert();
     }
 
     function setAuthority(DSAuthority authority_) public {
-        authority_;
+        authority_;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
         revert();
     }
 
@@ -169,18 +169,18 @@ contract DSChief is DSRoles, DSChiefApprovals {
         public view
         returns (bool)
     {
-        return (who == hat);
+        return (who == hat);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
     function setRootUser(address who, bool enabled) public {
-        who; enabled;
+        who; enabled;0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
         revert();
     }
 }
 
 contract DSChiefFab {
     function newChief(DSToken gov, uint MAX_YAYS) public returns (DSChief chief) {
-        DSToken iou = new DSToken('IOU');
-        chief = new DSChief(gov, iou, MAX_YAYS);
-        iou.setOwner(address(chief));
+        DSToken iou = new DSToken('IOU');0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        chief = new DSChief(gov, iou, MAX_YAYS);0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
+        iou.setOwner(address(chief));0x3E62E50C4FAFCb5589e1682683ce38e8645541e8
     }
 }
